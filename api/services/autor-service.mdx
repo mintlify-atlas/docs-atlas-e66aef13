@@ -1,0 +1,387 @@
+---
+title: 'AutorService'
+description: 'Manages CRUD operations for authors (autores) in the virtual library'
+---
+
+## Overview
+
+The `AutorService` provides methods to create, read, update, and delete authors in the Biblioteca Virtual system. It handles all HTTP communications with the backend `/autores` endpoint.
+
+**Location**: `src/app/core/services/autor.ts`
+
+## Constructor
+
+```typescript
+private http = inject(HttpClient);
+```
+
+Uses Angular's `inject()` function to obtain HttpClient instance.
+
+## Properties
+
+<ParamField path="apiUrl" type="string" default="${environment.apiUrl}/autores">
+  Base URL for autor endpoints, configured from environment settings.
+</ParamField>
+
+## Methods
+
+### getAll()
+
+Retrieves all authors from the database.
+
+```typescript
+getAll(): Observable<Autor[]>
+```
+
+**Returns**: `Observable<Autor[]>` - Array of all authors
+
+<ResponseField name="Autor[]" type="array">
+  Array of author objects
+  
+  <ResponseField name="id" type="number">
+    Unique author identifier
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Author's full name
+  </ResponseField>
+  
+  <ResponseField name="urlFoto" type="string" optional>
+    URL to the author's photo
+  </ResponseField>
+</ResponseField>
+
+**Example:**
+
+```typescript
+this.autorService.getAll().subscribe({
+  next: (autores) => {
+    console.log(`Found ${autores.length} authors`);
+    this.authors = autores;
+  },
+  error: (error) => {
+    console.error('Error fetching authors:', error);
+  }
+});
+```
+
+**API Endpoint**: `GET ${apiUrl}`
+
+---
+
+### getById()
+
+Retrieves a specific author by their ID.
+
+```typescript
+getById(id: number): Observable<Autor>
+```
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the author to retrieve
+</ParamField>
+
+**Returns**: `Observable<Autor>` - Single author object
+
+**Example:**
+
+```typescript
+const autorId = 5;
+
+this.autorService.getById(autorId).subscribe({
+  next: (autor) => {
+    console.log('Author details:', autor.nombre);
+    this.selectedAuthor = autor;
+  },
+  error: (error) => {
+    console.error('Author not found:', error);
+  }
+});
+```
+
+**API Endpoint**: `GET ${apiUrl}/{id}`
+
+**Use Case**: Loading author data for editing forms
+
+---
+
+### create()
+
+Creates a new author in the database.
+
+```typescript
+create(autor: Autor): Observable<Autor>
+```
+
+<ParamField path="autor" type="Autor" required>
+  Author data to create
+  
+  **Required Properties:**
+  - `nombre` (string): Author's full name
+  
+  **Optional Properties:**
+  - `urlFoto` (string): URL to author's photo
+  - `id` (number): Should be omitted for new authors (server assigns)
+</ParamField>
+
+**Returns**: `Observable<Autor>` - The created author with server-assigned ID
+
+**Example:**
+
+```typescript
+const newAuthor: Autor = {
+  id: 0, // Will be assigned by server
+  nombre: 'Gabriel García Márquez',
+  urlFoto: 'https://example.com/photos/gabo.jpg'
+};
+
+this.autorService.create(newAuthor).subscribe({
+  next: (createdAutor) => {
+    console.log('Author created with ID:', createdAutor.id);
+    this.router.navigate(['/autores']);
+  },
+  error: (error) => {
+    console.error('Error creating author:', error);
+  }
+});
+```
+
+**API Endpoint**: `POST ${apiUrl}`
+
+---
+
+### update()
+
+Updates an existing author.
+
+```typescript
+update(id: number, autor: Autor): Observable<Autor>
+```
+
+<ParamField path="id" type="number" required>
+  The ID of the author to update
+</ParamField>
+
+<ParamField path="autor" type="Autor" required>
+  Updated author data
+  
+  **Properties:**
+  - `id` (number): Author ID (should match path parameter)
+  - `nombre` (string): Updated author name
+  - `urlFoto` (string, optional): Updated photo URL
+</ParamField>
+
+**Returns**: `Observable<Autor>` - The updated author object
+
+**Example:**
+
+```typescript
+const updatedAuthor: Autor = {
+  id: 5,
+  nombre: 'Gabriel José de la Concordia García Márquez',
+  urlFoto: 'https://example.com/photos/gabo-updated.jpg'
+};
+
+this.autorService.update(5, updatedAuthor).subscribe({
+  next: (autor) => {
+    console.log('Author updated successfully:', autor.nombre);
+    this.loadAuthors();
+  },
+  error: (error) => {
+    console.error('Error updating author:', error);
+  }
+});
+```
+
+**API Endpoint**: `PUT ${apiUrl}/{id}`
+
+---
+
+### delete()
+
+Deletes an author from the database.
+
+```typescript
+delete(id: number): Observable<any>
+```
+
+<ParamField path="id" type="number" required>
+  The ID of the author to delete
+</ParamField>
+
+**Returns**: `Observable<any>` - Plain text response from server
+
+**Response Type**: Text (uses `responseType: 'text'` to accept string responses from backend)
+
+**Example:**
+
+```typescript
+const autorId = 5;
+
+if (confirm('¿Está seguro de eliminar este autor?')) {
+  this.autorService.delete(autorId).subscribe({
+    next: (response) => {
+      console.log('Delete response:', response);
+      this.loadAuthors(); // Refresh the list
+    },
+    error: (error) => {
+      console.error('Error deleting author:', error);
+      // May occur if author has associated books
+    }
+  });
+}
+```
+
+**API Endpoint**: `DELETE ${apiUrl}/{id}`
+
+**Note**: Deletion may fail if the author has associated books. Handle this error appropriately in your UI.
+
+## Complete CRUD Example
+
+Example component using all AutorService methods:
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { AutorService } from '../core/services/autor';
+import { Autor } from '../core/models/autor';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-autor-list',
+  templateUrl: './autor-list.html'
+})
+export class AutorListComponent implements OnInit {
+  autorService = inject(AutorService);
+  router = inject(Router);
+  autores: Autor[] = [];
+  loading = false;
+
+  ngOnInit() {
+    this.loadAutores();
+  }
+
+  loadAutores() {
+    this.loading = true;
+    this.autorService.getAll().subscribe({
+      next: (data) => {
+        this.autores = data;
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Error loading authors:', err);
+        this.loading = false;
+      }
+    });
+  }
+
+  editAutor(id: number) {
+    this.router.navigate(['/autores/editar', id]);
+  }
+
+  deleteAutor(id: number, nombre: string) {
+    if (confirm(`¿Eliminar autor "${nombre}"?`)) {
+      this.autorService.delete(id).subscribe({
+        next: () => {
+          this.loadAutores();
+        },
+        error: (err) => {
+          alert('No se puede eliminar el autor. Puede tener libros asociados.');
+        }
+      });
+    }
+  }
+}
+```
+
+## Form Example
+
+Example form component for creating/editing authors:
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AutorService } from '../core/services/autor';
+import { Autor } from '../core/models/autor';
+
+@Component({
+  selector: 'app-autor-form',
+  templateUrl: './autor-form.html'
+})
+export class AutorFormComponent implements OnInit {
+  autorService = inject(AutorService);
+  route = inject(ActivatedRoute);
+  router = inject(Router);
+
+  autor: Autor = { id: 0, nombre: '', urlFoto: '' };
+  isEditMode = false;
+
+  ngOnInit() {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.isEditMode = true;
+      this.loadAutor(Number(id));
+    }
+  }
+
+  loadAutor(id: number) {
+    this.autorService.getById(id).subscribe({
+      next: (data) => {
+        this.autor = data;
+      }
+    });
+  }
+
+  save() {
+    if (this.isEditMode) {
+      this.autorService.update(this.autor.id, this.autor).subscribe({
+        next: () => this.router.navigate(['/autores']),
+        error: (err) => console.error('Error updating:', err)
+      });
+    } else {
+      this.autorService.create(this.autor).subscribe({
+        next: () => this.router.navigate(['/autores']),
+        error: (err) => console.error('Error creating:', err)
+      });
+    }
+  }
+}
+```
+
+## Data Model
+
+### Autor Interface
+
+```typescript
+export interface Autor {
+  id: number;
+  nombre: string;
+  urlFoto?: string;
+}
+```
+
+## Error Handling
+
+Common error scenarios and how to handle them:
+
+```typescript
+this.autorService.delete(id).subscribe({
+  next: (response) => { /* success */ },
+  error: (error) => {
+    if (error.status === 404) {
+      console.error('Author not found');
+    } else if (error.status === 409) {
+      console.error('Cannot delete: author has associated books');
+    } else if (error.status === 403) {
+      console.error('Access forbidden: admin privileges required');
+    } else {
+      console.error('Unexpected error:', error);
+    }
+  }
+});
+```
+
+## See Also
+
+- [LibroService](/api/services/libro-service) - Managing books with authors
+- [GeneroService](/api/services/genero-service) - Managing book genres
+- [Autor Model](/api/models/autor) - Author data structure

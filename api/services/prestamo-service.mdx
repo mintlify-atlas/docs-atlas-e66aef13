@@ -1,0 +1,457 @@
+---
+title: 'PrestamoService'
+description: 'Manages book loan requests, approvals, and rejections in the virtual library'
+---
+
+## Overview
+
+The `PrestamoService` handles all operations related to book loans (préstamos) including requesting loans, listing loans, and managing loan approvals/rejections. It provides different methods for regular users and administrators.
+
+**Location**: `src/app/core/services/prestamo.ts`
+
+## Constructor
+
+```typescript
+private http = inject(HttpClient);
+```
+
+Uses Angular's `inject()` function to obtain HttpClient instance.
+
+## Properties
+
+<ParamField path="apiUrl" type="string" default="${environment.apiUrl}/prestamos">
+  Base URL for prestamo endpoints, configured from environment settings.
+</ParamField>
+
+## Methods
+
+### solicitar()
+
+Requests a loan for a specific book. Available to authenticated users.
+
+```typescript
+solicitar(libroId: number): Observable<any>
+```
+
+<ParamField path="libroId" type="number" required>
+  The unique identifier of the book to borrow
+</ParamField>
+
+**Returns**: `Observable<any>` - Plain text response from server
+
+**Response Type**: Text (uses `responseType: 'text'`)
+
+**Example:**
+
+```typescript
+const bookId = 42;
+
+this.prestamoService.solicitar(bookId).subscribe({
+  next: (response) => {
+    console.log('Loan requested:', response);
+    alert('Solicitud de préstamo enviada exitosamente');
+  },
+  error: (error) => {
+    if (error.status === 400) {
+      alert('El libro no está disponible');
+    } else {
+      console.error('Error requesting loan:', error);
+    }
+  }
+});
+```
+
+**API Endpoint**: `POST ${apiUrl}/solicitar/{libroId}`
+
+**Request Body**: Empty object `{}`
+
+**Use Case**: When a user wants to borrow a book from the catalog
+
+---
+
+### getAll()
+
+Retrieves all loan requests from all users. Admin-only endpoint.
+
+```typescript
+getAll(): Observable<Prestamo[]>
+```
+
+**Returns**: `Observable<Prestamo[]>` - Array of all loan requests
+
+<ResponseField name="Prestamo[]" type="array">
+  Array of loan objects
+  
+  <ResponseField name="id" type="number">
+    Unique loan identifier
+  </ResponseField>
+  
+  <ResponseField name="fechaSolicitud" type="string">
+    Date when the loan was requested (ISO 8601 format)
+  </ResponseField>
+  
+  <ResponseField name="fechaDevolucion" type="string" optional>
+    Date when the book was returned (if applicable)
+  </ResponseField>
+  
+  <ResponseField name="estado" type="string">
+    Loan status: "PENDIENTE", "APROBADO", or "RECHAZADO"
+  </ResponseField>
+  
+  <ResponseField name="libro" type="Libro">
+    Complete book object (id, titulo, portada, genero, autores, etc.)
+  </ResponseField>
+  
+  <ResponseField name="usuario" type="any">
+    User information from Spring Boot backend
+  </ResponseField>
+</ResponseField>
+
+**Example:**
+
+```typescript
+// Admin component
+this.prestamoService.getAll().subscribe({
+  next: (prestamos) => {
+    console.log(`Found ${prestamos.length} loan requests`);
+    this.allLoans = prestamos;
+    
+    // Filter by status
+    this.pendingLoans = prestamos.filter(p => p.estado === 'PENDIENTE');
+    this.approvedLoans = prestamos.filter(p => p.estado === 'APROBADO');
+  },
+  error: (error) => {
+    console.error('Error fetching loans:', error);
+  }
+});
+```
+
+**API Endpoint**: `GET ${apiUrl}/todos`
+
+**Authorization**: Requires ROLE_ADMIN
+
+---
+
+### getMisPrestamos()
+
+Retrieves loan requests for the currently authenticated user.
+
+```typescript
+getMisPrestamos(): Observable<Prestamo[]>
+```
+
+**Returns**: `Observable<Prestamo[]>` - Array of current user's loan requests
+
+**Example:**
+
+```typescript
+// User component
+this.prestamoService.getMisPrestamos().subscribe({
+  next: (misPrestamos) => {
+    console.log(`You have ${misPrestamos.length} loan requests`);
+    this.myLoans = misPrestamos;
+    
+    // Show status to user
+    misPrestamos.forEach(prestamo => {
+      console.log(`${prestamo.libro.titulo} - ${prestamo.estado}`);
+    });
+  },
+  error: (error) => {
+    console.error('Error fetching my loans:', error);
+  }
+});
+```
+
+**API Endpoint**: `GET ${apiUrl}/mios`
+
+**Authorization**: Requires authentication (ROLE_USER or ROLE_ADMIN)
+
+**Use Case**: Displaying user's loan history and current requests
+
+---
+
+### aprobar()
+
+Approves a pending loan request. Admin-only operation.
+
+```typescript
+aprobar(id: number): Observable<any>
+```
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the loan to approve
+</ParamField>
+
+**Returns**: `Observable<any>` - Plain text response from server
+
+**Response Type**: Text (uses `responseType: 'text'`)
+
+**Example:**
+
+```typescript
+const prestamoId = 15;
+
+this.prestamoService.aprobar(prestamoId).subscribe({
+  next: (response) => {
+    console.log('Loan approved:', response);
+    alert('Préstamo aprobado exitosamente');
+    this.loadPendingLoans(); // Refresh the list
+  },
+  error: (error) => {
+    console.error('Error approving loan:', error);
+  }
+});
+```
+
+**API Endpoint**: `POST ${apiUrl}/aprobar/{id}`
+
+**Request Body**: Empty object `{}`
+
+**Authorization**: Requires ROLE_ADMIN
+
+**Behavior**: Changes loan status from PENDIENTE to APROBADO
+
+---
+
+### rechazar()
+
+Rejects a pending loan request. Admin-only operation.
+
+```typescript
+rechazar(id: number): Observable<any>
+```
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the loan to reject
+</ParamField>
+
+**Returns**: `Observable<any>` - Plain text response from server
+
+**Response Type**: Text (uses `responseType: 'text'`)
+
+**Example:**
+
+```typescript
+const prestamoId = 15;
+
+if (confirm('¿Está seguro de rechazar este préstamo?')) {
+  this.prestamoService.rechazar(prestamoId).subscribe({
+    next: (response) => {
+      console.log('Loan rejected:', response);
+      alert('Préstamo rechazado');
+      this.loadPendingLoans(); // Refresh the list
+    },
+    error: (error) => {
+      console.error('Error rejecting loan:', error);
+    }
+  });
+}
+```
+
+**API Endpoint**: `POST ${apiUrl}/rechazar/{id}`
+
+**Request Body**: Empty object `{}`
+
+**Authorization**: Requires ROLE_ADMIN
+
+**Behavior**: Changes loan status from PENDIENTE to RECHAZADO
+
+## Complete Usage Examples
+
+### User Component (Request and View Loans)
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { PrestamoService } from '../core/services/prestamo';
+import { Prestamo } from '../core/models/prestamo';
+
+@Component({
+  selector: 'app-my-loans',
+  templateUrl: './my-loans.html'
+})
+export class MyLoansComponent implements OnInit {
+  prestamoService = inject(PrestamoService);
+  myLoans: Prestamo[] = [];
+  loading = false;
+
+  ngOnInit() {
+    this.loadMyLoans();
+  }
+
+  loadMyLoans() {
+    this.loading = true;
+    this.prestamoService.getMisPrestamos().subscribe({
+      next: (prestamos) => {
+        this.myLoans = prestamos;
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Error loading loans:', err);
+        this.loading = false;
+      }
+    });
+  }
+
+  requestLoan(libroId: number) {
+    this.prestamoService.solicitar(libroId).subscribe({
+      next: (response) => {
+        alert('Préstamo solicitado exitosamente');
+        this.loadMyLoans(); // Refresh to show new request
+      },
+      error: (err) => {
+        alert('Error al solicitar préstamo');
+      }
+    });
+  }
+
+  getStatusClass(estado: string): string {
+    switch(estado) {
+      case 'PENDIENTE': return 'badge-warning';
+      case 'APROBADO': return 'badge-success';
+      case 'RECHAZADO': return 'badge-danger';
+      default: return 'badge-secondary';
+    }
+  }
+}
+```
+
+### Admin Component (Manage All Loans)
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { PrestamoService } from '../core/services/prestamo';
+import { Prestamo } from '../core/models/prestamo';
+
+@Component({
+  selector: 'app-prestamo-list',
+  templateUrl: './prestamo-list.html'
+})
+export class PrestamoListComponent implements OnInit {
+  prestamoService = inject(PrestamoService);
+  prestamos: Prestamo[] = [];
+  filteredPrestamos: Prestamo[] = [];
+  selectedFilter: string = 'TODOS';
+
+  ngOnInit() {
+    this.loadPrestamos();
+  }
+
+  loadPrestamos() {
+    this.prestamoService.getAll().subscribe({
+      next: (data) => {
+        this.prestamos = data;
+        this.applyFilter();
+      },
+      error: (err) => {
+        console.error('Error loading loans:', err);
+      }
+    });
+  }
+
+  applyFilter() {
+    if (this.selectedFilter === 'TODOS') {
+      this.filteredPrestamos = this.prestamos;
+    } else {
+      this.filteredPrestamos = this.prestamos.filter(
+        p => p.estado === this.selectedFilter
+      );
+    }
+  }
+
+  aprobarPrestamo(id: number) {
+    this.prestamoService.aprobar(id).subscribe({
+      next: () => {
+        alert('Préstamo aprobado');
+        this.loadPrestamos();
+      },
+      error: (err) => {
+        console.error('Error approving loan:', err);
+      }
+    });
+  }
+
+  rechazarPrestamo(id: number) {
+    if (confirm('¿Rechazar este préstamo?')) {
+      this.prestamoService.rechazar(id).subscribe({
+        next: () => {
+          alert('Préstamo rechazado');
+          this.loadPrestamos();
+        },
+        error: (err) => {
+          console.error('Error rejecting loan:', err);
+        }
+      });
+    }
+  }
+}
+```
+
+## Data Model
+
+### Prestamo Interface
+
+```typescript
+import { Libro } from './libro';
+
+export interface Prestamo {
+  id: number;
+  fechaSolicitud: string;
+  fechaDevolucion?: string;
+  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  libro: Libro;
+  usuario: any; // Complete user object from Spring Boot
+}
+```
+
+## Estado (Status) Values
+
+<ParamField path="PENDIENTE" type="string">
+  Loan request is awaiting admin approval
+</ParamField>
+
+<ParamField path="APROBADO" type="string">
+  Loan has been approved by an administrator
+</ParamField>
+
+<ParamField path="RECHAZADO" type="string">
+  Loan has been rejected by an administrator
+</ParamField>
+
+## Error Handling
+
+Common error scenarios:
+
+```typescript
+this.prestamoService.solicitar(libroId).subscribe({
+  next: (response) => { /* success */ },
+  error: (error) => {
+    if (error.status === 400) {
+      console.error('Book not available or already requested');
+    } else if (error.status === 401) {
+      console.error('Authentication required');
+    } else if (error.status === 403) {
+      console.error('Access forbidden');
+    } else if (error.status === 404) {
+      console.error('Book not found');
+    } else {
+      console.error('Unexpected error:', error);
+    }
+  }
+});
+```
+
+## Authorization Requirements
+
+| Method | Required Role | Description |
+|--------|--------------|-------------|
+| `solicitar()` | ROLE_USER or ROLE_ADMIN | Any authenticated user |
+| `getMisPrestamos()` | ROLE_USER or ROLE_ADMIN | Any authenticated user |
+| `getAll()` | ROLE_ADMIN | Admin only |
+| `aprobar()` | ROLE_ADMIN | Admin only |
+| `rechazar()` | ROLE_ADMIN | Admin only |
+
+## See Also
+
+- [LibroService](/api/services/libro-service) - Managing books available for loans
+- [AuthService](/api/services/auth-service) - User authentication and roles
+- [Prestamo Model](/api/models/prestamo) - Loan data structure

@@ -1,0 +1,302 @@
+---
+title: 'AuthService'
+description: 'Manages user authentication, registration, and session management with JWT tokens'
+---
+
+## Overview
+
+The `AuthService` handles all authentication-related operations including user login, registration, logout, and role verification. It integrates with the backend API and uses the `TokenStorageService` to manage JWT tokens.
+
+**Location**: `src/app/auth/auth.service.ts`
+
+## Constructor
+
+```typescript
+constructor(
+  private http: HttpClient,
+  private tokenStorage: TokenStorageService
+)
+```
+
+Injects Angular's HttpClient for API calls and TokenStorageService for JWT management.
+
+## Properties
+
+<ParamField path="API_URL" type="string" default="${environment.apiUrl}/auth">
+  Base URL for authentication endpoints, configured from environment settings.
+</ParamField>
+
+## Methods
+
+### login()
+
+Authenticates a user with username and password.
+
+```typescript
+login(usuario: AuthRequest): Observable<AuthResponse>
+```
+
+<ParamField path="usuario" type="AuthRequest" required>
+  User credentials containing username and password
+  
+  **Properties:**
+  - `username` (string): User's username
+  - `password` (string): User's password
+</ParamField>
+
+**Returns**: `Observable<AuthResponse>`
+
+<ResponseField name="AuthResponse" type="object">
+  Authentication response from the server
+  
+  <ResponseField name="token" type="string">
+    JWT token for authenticated requests
+  </ResponseField>
+  
+  <ResponseField name="tipoToken" type="string">
+    Token type (typically "Bearer")
+  </ResponseField>
+  
+  <ResponseField name="username" type="string">
+    Authenticated user's username
+  </ResponseField>
+  
+  <ResponseField name="role" type="string">
+    User's role (e.g., "ROLE_ADMIN" or "ROLE_USER")
+  </ResponseField>
+</ResponseField>
+
+**Example:**
+
+```typescript
+const credentials: AuthRequest = {
+  username: 'john.doe',
+  password: 'securePassword123'
+};
+
+this.authService.login(credentials).subscribe({
+  next: (response) => {
+    this.authService.saveSession(response);
+    console.log('Login successful:', response.username);
+  },
+  error: (error) => {
+    console.error('Login failed:', error);
+  }
+});
+```
+
+**API Endpoint**: `POST ${API_URL}/login`
+
+---
+
+### register()
+
+Registers a new user account.
+
+```typescript
+register(usuario: AuthRequest): Observable<any>
+```
+
+<ParamField path="usuario" type="AuthRequest" required>
+  User registration data containing username and password
+  
+  **Properties:**
+  - `username` (string): Desired username
+  - `password` (string): User's password
+</ParamField>
+
+**Returns**: `Observable<any>` - Returns plain text response from the server
+
+**Example:**
+
+```typescript
+const newUser: AuthRequest = {
+  username: 'jane.smith',
+  password: 'strongPassword456'
+};
+
+this.authService.register(newUser).subscribe({
+  next: (message) => {
+    console.log('Registration successful:', message);
+  },
+  error: (error) => {
+    console.error('Registration failed:', error);
+  }
+});
+```
+
+**API Endpoint**: `POST ${API_URL}/register`
+
+**Response Type**: Plain text (string)
+
+---
+
+### saveSession()
+
+Saves authentication data to local storage after successful login.
+
+```typescript
+saveSession(response: AuthResponse): void
+```
+
+<ParamField path="response" type="AuthResponse" required>
+  Authentication response containing token, username, and role
+</ParamField>
+
+**Returns**: `void`
+
+**Behavior:**
+- Saves JWT token using `TokenStorageService`
+- Stores username in localStorage
+- Stores user role in localStorage
+
+**Example:**
+
+```typescript
+this.authService.login(credentials).subscribe((response) => {
+  this.authService.saveSession(response);
+  this.router.navigate(['/catalogo']);
+});
+```
+
+---
+
+### logout()
+
+Clears all authentication data and logs out the current user.
+
+```typescript
+logout(): void
+```
+
+**Returns**: `void`
+
+**Behavior:**
+- Removes JWT token using `TokenStorageService.signOut()`
+- Removes username from localStorage
+- Removes role from localStorage
+
+**Example:**
+
+```typescript
+onLogout() {
+  this.authService.logout();
+  this.router.navigate(['/login']);
+}
+```
+
+---
+
+### isAdmin()
+
+Checks if the current user has admin privileges.
+
+```typescript
+isAdmin(): boolean
+```
+
+**Returns**: `boolean` - `true` if user has ROLE_ADMIN, `false` otherwise
+
+**Example:**
+
+```typescript
+if (this.authService.isAdmin()) {
+  // Show admin features
+  this.showAdminPanel = true;
+}
+```
+
+---
+
+### isUser()
+
+Checks if the current user has regular user privileges.
+
+```typescript
+isUser(): boolean
+```
+
+**Returns**: `boolean` - `true` if user has ROLE_USER, `false` otherwise
+
+**Example:**
+
+```typescript
+if (this.authService.isUser()) {
+  // Show user-specific features
+  this.showUserDashboard = true;
+}
+```
+
+## Usage Example
+
+Complete authentication flow:
+
+```typescript
+import { Component } from '@angular/core';
+import { AuthService } from './auth/auth.service';
+import { AuthRequest } from './core/models/auth.interface';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-login',
+  template: `...`
+})
+export class LoginComponent {
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) {}
+
+  login(username: string, password: string) {
+    const credentials: AuthRequest = { username, password };
+    
+    this.authService.login(credentials).subscribe({
+      next: (response) => {
+        this.authService.saveSession(response);
+        
+        // Redirect based on role
+        if (this.authService.isAdmin()) {
+          this.router.navigate(['/admin']);
+        } else {
+          this.router.navigate(['/catalogo']);
+        }
+      },
+      error: (error) => {
+        console.error('Authentication failed:', error);
+      }
+    });
+  }
+
+  logout() {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
+}
+```
+
+## Error Handling
+
+All HTTP methods return Observables that may emit errors. Common error scenarios:
+
+- **401 Unauthorized**: Invalid credentials
+- **409 Conflict**: Username already exists (registration)
+- **500 Server Error**: Backend service unavailable
+
+```typescript
+this.authService.login(credentials).subscribe({
+  next: (response) => { /* success */ },
+  error: (error) => {
+    if (error.status === 401) {
+      console.error('Invalid credentials');
+    } else if (error.status === 500) {
+      console.error('Server error');
+    }
+  }
+});
+```
+
+## See Also
+
+- [TokenStorageService](/api/services/token-storage-service) - JWT token management
+- [AuthInterceptor](/api/interceptors/auth-interceptor) - Automatic token injection
+- [AuthGuard](/api/guards/auth-guard) - Route protection

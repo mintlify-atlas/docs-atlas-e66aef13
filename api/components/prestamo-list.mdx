@@ -1,0 +1,185 @@
+---
+title: PrestamoListComponent
+description: Component for managing book loan requests (Admin)
+---
+
+## Overview
+
+The `PrestamoListComponent` provides administrators with a view of all loan requests in the system. Admins can approve or reject pending loan requests, and view the history of all loans.
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-prestamo-list',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './prestamo-list.html',
+  styleUrls: ['./prestamo-list.css'],
+})
+```
+
+**Selector:** `app-prestamo-list`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+
+**Template:** `./prestamo-list.html`
+
+## Properties
+
+### prestamos
+
+```typescript
+prestamos: Prestamo[] = []
+```
+
+Array containing all loan requests in the system. Each `Prestamo` object includes:
+- `id`: Loan request identifier
+- `libro`: Book object with title and details
+- `usuario`: User who requested the loan
+- `fechaSolicitud`: Date when the loan was requested
+- `estado`: Loan status (PENDIENTE, APROBADO, RECHAZADO)
+
+The array is sorted by ID in descending order (newest first) with pending requests prioritized.
+
+## Injected Services
+
+```typescript
+private prestamoService = inject(PrestamoService)
+```
+
+- **PrestamoService** - Handles all loan-related API operations
+
+## Lifecycle Hooks
+
+### ngOnInit
+
+```typescript
+ngOnInit(): void {
+  this.cargarPrestamos();
+}
+```
+
+Called when the component initializes. Immediately loads all loan requests from the backend.
+
+## Methods
+
+### cargarPrestamos
+
+```typescript
+cargarPrestamos(): void
+```
+
+Fetches all loan requests from the `PrestamoService`:
+- Calls `PrestamoService.getAll()`
+- Sorts the results by ID in descending order (newest first)
+- Populates the `prestamos` array
+
+This method is called on initialization and after approving or rejecting a loan to refresh the list.
+
+### aprobar
+
+```typescript
+aprobar(id: number): void
+```
+
+Approves a pending loan request:
+
+1. Displays confirmation dialog "¿Aprobar este préstamo? El libro dejará de estar disponible."
+2. If confirmed, calls `PrestamoService.aprobar()` with the loan ID
+3. On success:
+   - Shows alert "Préstamo Aprobado"
+   - Reloads the loan list by calling `cargarPrestamos()`
+
+When a loan is approved, the associated book's `disponible` status is set to `false` by the backend.
+
+**Parameters:**
+- `id` - The numeric ID of the loan request to approve
+
+### rechazar
+
+```typescript
+rechazar(id: number): void
+```
+
+Rejects a pending loan request:
+
+1. Displays confirmation dialog "¿Rechazar solicitud?"
+2. If confirmed, calls `PrestamoService.rechazar()` with the loan ID
+3. On success:
+   - Shows alert "Solicitud Rechazada"
+   - Reloads the loan list by calling `cargarPrestamos()`
+
+Rejecting a loan does not affect the book's availability status.
+
+**Parameters:**
+- `id` - The numeric ID of the loan request to reject
+
+## Full Source Code
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { PrestamoService } from '../../../core/services/prestamo';
+import { Prestamo } from '../../../core/models/prestamo';
+
+@Component({
+  selector: 'app-prestamo-list',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './prestamo-list.html',
+  styleUrls: ['./prestamo-list.css'],
+})
+export class PrestamoListComponent implements OnInit {
+  private prestamoService = inject(PrestamoService);
+  prestamos: Prestamo[] = [];
+
+  ngOnInit(): void {
+    this.cargarPrestamos();
+  }
+
+  cargarPrestamos(): void {
+    this.prestamoService.getAll().subscribe({
+      next: (data) => {
+        // Los PENDIENTES primero
+        this.prestamos = data.sort((a, b) => b.id - a.id);
+      },
+    });
+  }
+
+  aprobar(id: number): void {
+    if (
+      confirm('¿Aprobar este préstamo? El libro dejará de estar disponible.')
+    ) {
+      this.prestamoService.aprobar(id).subscribe(() => {
+        alert('Préstamo Aprobado');
+        this.cargarPrestamos();
+      });
+    }
+  }
+
+  rechazar(id: number): void {
+    if (confirm('¿Rechazar solicitud?')) {
+      this.prestamoService.rechazar(id).subscribe(() => {
+        alert('Solicitud Rechazada');
+        this.cargarPrestamos();
+      });
+    }
+  }
+}
+```
+
+## Related Components
+
+- [CatalogoComponent](/api/components/catalogo) - Where users request loans
+- [LibroListComponent](/api/components/libro-list) - Manage book availability
+
+## Related Services
+
+- [PrestamoService](/api/services/prestamo) - Loan CRUD and approval operations
+
+## Related Models
+
+- [Prestamo](/api/models/prestamo) - Loan request data structure
+- [Libro](/api/models/libro) - Book data structure

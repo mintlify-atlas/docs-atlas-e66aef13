@@ -1,122 +1,123 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Biblioteca Virtual Frontend",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#2C5F8D",
+    "light": "#4A90D9",
+    "dark": "#1A3A52"
   },
   "favicon": "/favicon.svg",
-  "navigation": {
-    "tabs": [
-      {
-        "tab": "Guides",
-        "groups": [
-          {
-            "group": "Getting started",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
-            ]
-          },
-          {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
-            ]
-          }
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "type": "github",
+      "href": "https://github.com/AngheloMP10/biblioteca-virtual-frontend"
     }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/AngheloMP10/biblioteca-virtual-frontend"
     }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "architecture/overview",
+              "architecture/routing",
+              "architecture/authentication",
+              "architecture/authorization"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/catalog",
+              "features/loans",
+              "features/admin-panel"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/environment",
+              "deployment/ci-cd"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": [
+              "api/services/auth-service",
+              "api/services/libro-service",
+              "api/services/autor-service",
+              "api/services/genero-service",
+              "api/services/prestamo-service",
+              "api/services/token-storage-service"
+            ]
+          },
+          {
+            "group": "Guards",
+            "pages": [
+              "api/guards/auth-guard",
+              "api/guards/admin-guard",
+              "api/guards/public-guard"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/auth-interface",
+              "api/models/libro",
+              "api/models/autor",
+              "api/models/genero",
+              "api/models/prestamo"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "api/components/login",
+              "api/components/registro",
+              "api/components/catalogo",
+              "api/components/libro-list",
+              "api/components/libro-form",
+              "api/components/autor-list",
+              "api/components/autor-form",
+              "api/components/genero-list",
+              "api/components/genero-form",
+              "api/components/prestamo-list"
+            ]
+          },
+          {
+            "group": "Interceptors",
+            "pages": [
+              "api/interceptors/auth-interceptor"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

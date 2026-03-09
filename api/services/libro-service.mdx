@@ -1,0 +1,368 @@
+---
+title: 'LibroService'
+description: 'Manages CRUD operations for books (libros) in the virtual library'
+---
+
+## Overview
+
+The `LibroService` provides methods to create, read, update, and delete books in the Biblioteca Virtual system. It handles all HTTP communications with the backend `/libros` endpoint.
+
+**Location**: `src/app/core/services/libro.ts`
+
+## Constructor
+
+```typescript
+private http = inject(HttpClient);
+```
+
+Uses Angular's `inject()` function to obtain HttpClient instance.
+
+## Properties
+
+<ParamField path="apiUrl" type="string" default="${environment.apiUrl}/libros">
+  Base URL for libro endpoints, configured from environment settings.
+</ParamField>
+
+## Methods
+
+### getAll()
+
+Retrieves all books from the library.
+
+```typescript
+getAll(): Observable<Libro[]>
+```
+
+**Returns**: `Observable<Libro[]>` - Array of all books
+
+<ResponseField name="Libro[]" type="array">
+  Array of book objects
+  
+  <ResponseField name="id" type="number">
+    Unique book identifier
+  </ResponseField>
+  
+  <ResponseField name="titulo" type="string">
+    Book title
+  </ResponseField>
+  
+  <ResponseField name="portada" type="string" optional>
+    URL to the book cover image
+  </ResponseField>
+  
+  <ResponseField name="anioPublicacion" type="number" optional>
+    Year of publication
+  </ResponseField>
+  
+  <ResponseField name="disponible" type="boolean">
+    Whether the book is available for borrowing
+  </ResponseField>
+  
+  <ResponseField name="genero" type="Genero">
+    Book's genre (id and nombre)
+  </ResponseField>
+  
+  <ResponseField name="autores" type="Autor[]">
+    Array of authors (id, nombre, urlFoto)
+  </ResponseField>
+</ResponseField>
+
+**Example:**
+
+```typescript
+this.libroService.getAll().subscribe({
+  next: (libros) => {
+    console.log(`Found ${libros.length} books`);
+    this.books = libros;
+  },
+  error: (error) => {
+    console.error('Error fetching books:', error);
+  }
+});
+```
+
+**API Endpoint**: `GET ${apiUrl}`
+
+---
+
+### getById()
+
+Retrieves a specific book by its ID.
+
+```typescript
+getById(id: number): Observable<Libro>
+```
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the book to retrieve
+</ParamField>
+
+**Returns**: `Observable<Libro>` - Single book object
+
+**Example:**
+
+```typescript
+const libroId = 42;
+
+this.libroService.getById(libroId).subscribe({
+  next: (libro) => {
+    console.log('Book details:', libro.titulo);
+    this.selectedBook = libro;
+  },
+  error: (error) => {
+    console.error('Book not found:', error);
+  }
+});
+```
+
+**API Endpoint**: `GET ${apiUrl}/{id}`
+
+**Use Case**: Loading book data for editing forms
+
+---
+
+### create()
+
+Creates a new book in the library.
+
+```typescript
+create(libro: any): Observable<Libro>
+```
+
+<ParamField path="libro" type="object" required>
+  Book data to create. Must include genero and autores.
+  
+  **Required Properties:**
+  - `titulo` (string): Book title
+  - `disponible` (boolean): Availability status
+  - `genero` (Genero): Genre object with id and nombre
+  - `autores` (Autor[]): Array of author objects
+  
+  **Optional Properties:**
+  - `portada` (string): Cover image URL
+  - `anioPublicacion` (number): Publication year
+</ParamField>
+
+**Returns**: `Observable<Libro>` - The created book with server-assigned ID
+
+**Example:**
+
+```typescript
+const newBook = {
+  titulo: 'Cien años de soledad',
+  portada: 'https://example.com/cover.jpg',
+  anioPublicacion: 1967,
+  disponible: true,
+  genero: {
+    id: 1,
+    nombre: 'Realismo Mágico'
+  },
+  autores: [
+    {
+      id: 5,
+      nombre: 'Gabriel García Márquez',
+      urlFoto: 'https://example.com/gabo.jpg'
+    }
+  ]
+};
+
+this.libroService.create(newBook).subscribe({
+  next: (createdLibro) => {
+    console.log('Book created with ID:', createdLibro.id);
+    this.router.navigate(['/libros']);
+  },
+  error: (error) => {
+    console.error('Error creating book:', error);
+  }
+});
+```
+
+**API Endpoint**: `POST ${apiUrl}`
+
+---
+
+### update()
+
+Updates an existing book.
+
+```typescript
+update(id: number, libro: any): Observable<Libro>
+```
+
+<ParamField path="id" type="number" required>
+  The ID of the book to update
+</ParamField>
+
+<ParamField path="libro" type="object" required>
+  Updated book data. Should include all required fields (titulo, disponible, genero, autores)
+</ParamField>
+
+**Returns**: `Observable<Libro>` - The updated book object
+
+**Example:**
+
+```typescript
+const updatedBook = {
+  titulo: 'Cien años de soledad (Edición Especial)',
+  portada: 'https://example.com/new-cover.jpg',
+  anioPublicacion: 1967,
+  disponible: false, // Currently borrowed
+  genero: { id: 1, nombre: 'Realismo Mágico' },
+  autores: [{ id: 5, nombre: 'Gabriel García Márquez' }]
+};
+
+this.libroService.update(42, updatedBook).subscribe({
+  next: (libro) => {
+    console.log('Book updated successfully');
+    this.loadBooks();
+  },
+  error: (error) => {
+    console.error('Error updating book:', error);
+  }
+});
+```
+
+**API Endpoint**: `PUT ${apiUrl}/{id}`
+
+---
+
+### delete()
+
+Deletes a book from the library.
+
+```typescript
+delete(id: number): Observable<any>
+```
+
+<ParamField path="id" type="number" required>
+  The ID of the book to delete
+</ParamField>
+
+**Returns**: `Observable<any>` - Plain text response from server
+
+**Response Type**: Text (uses `responseType: 'text'` to handle empty or plain text responses)
+
+**Example:**
+
+```typescript
+const libroId = 42;
+
+if (confirm('¿Está seguro de eliminar este libro?')) {
+  this.libroService.delete(libroId).subscribe({
+    next: (response) => {
+      console.log('Delete response:', response);
+      this.loadBooks(); // Refresh the list
+    },
+    error: (error) => {
+      console.error('Error deleting book:', error);
+    }
+  });
+}
+```
+
+**API Endpoint**: `DELETE ${apiUrl}/{id}`
+
+## Complete CRUD Example
+
+Example component using all LibroService methods:
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { LibroService } from '../core/services/libro';
+import { Libro } from '../core/models/libro';
+
+@Component({
+  selector: 'app-libro-list',
+  templateUrl: './libro-list.html'
+})
+export class LibroListComponent implements OnInit {
+  libroService = inject(LibroService);
+  libros: Libro[] = [];
+
+  ngOnInit() {
+    this.loadLibros();
+  }
+
+  loadLibros() {
+    this.libroService.getAll().subscribe({
+      next: (data) => {
+        this.libros = data;
+      },
+      error: (err) => console.error(err)
+    });
+  }
+
+  editLibro(id: number) {
+    this.libroService.getById(id).subscribe({
+      next: (libro) => {
+        // Load into edit form
+        this.openEditForm(libro);
+      }
+    });
+  }
+
+  deleteLibro(id: number) {
+    this.libroService.delete(id).subscribe({
+      next: () => {
+        this.loadLibros();
+      }
+    });
+  }
+}
+```
+
+## Data Models
+
+### Libro Interface
+
+```typescript
+interface Libro {
+  id: number;
+  titulo: string;
+  portada?: string;
+  anioPublicacion?: number;
+  disponible: boolean;
+  genero: Genero;
+  autores: Autor[];
+}
+```
+
+### Related Interfaces
+
+```typescript
+interface Genero {
+  id: number;
+  nombre: string;
+}
+
+interface Autor {
+  id: number;
+  nombre: string;
+  urlFoto?: string;
+}
+```
+
+## Error Handling
+
+All methods return Observables that may emit errors:
+
+```typescript
+this.libroService.getAll().subscribe({
+  next: (libros) => { /* success */ },
+  error: (error) => {
+    if (error.status === 404) {
+      console.error('Book not found');
+    } else if (error.status === 403) {
+      console.error('Access forbidden');
+    } else {
+      console.error('Unexpected error:', error);
+    }
+  }
+});
+```
+
+## See Also
+
+- [AutorService](/api/services/autor-service) - Managing book authors
+- [GeneroService](/api/services/genero-service) - Managing book genres
+- [PrestamoService](/api/services/prestamo-service) - Managing book loans

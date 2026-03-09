@@ -1,0 +1,148 @@
+---
+title: 'Auth Interfaces'
+description: 'Authentication request and response interfaces for user login and registration'
+icon: 'shield-halved'
+---
+
+## AuthRequest
+
+Interface for authentication requests sent to the login and registration endpoints.
+
+### Interface Definition
+
+```typescript
+export interface AuthRequest {
+  username: string;
+  password: string;
+}
+```
+
+### Properties
+
+<ParamField path="username" type="string" required>
+  The username for authentication. Used for both login and registration.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  The user's password. Should be transmitted securely over HTTPS.
+</ParamField>
+
+---
+
+## AuthResponse
+
+Interface for authentication responses received after successful login.
+
+### Interface Definition
+
+```typescript
+export interface AuthResponse {
+  token: string;
+  tipoToken: string;
+  username: string;
+  role: string;
+}
+```
+
+### Properties
+
+<ParamField path="token" type="string" required>
+  The JWT authentication token used for subsequent API requests. Store this securely in localStorage.
+</ParamField>
+
+<ParamField path="tipoToken" type="string" required>
+  The type of token, typically "Bearer" for JWT tokens.
+</ParamField>
+
+<ParamField path="username" type="string" required>
+  The authenticated user's username.
+</ParamField>
+
+<ParamField path="role" type="string" required>
+  The user's role in the system. Common values: `ROLE_ADMIN`, `ROLE_USER`.
+</ParamField>
+
+---
+
+## Usage Examples
+
+### Login Request
+
+```typescript
+import { AuthService } from './auth/auth.service';
+import { AuthRequest, AuthResponse } from './core/models/auth.interface';
+
+const loginData: AuthRequest = {
+  username: 'usuario@ejemplo.com',
+  password: 'password123'
+};
+
+this.authService.login(loginData).subscribe({
+  next: (response: AuthResponse) => {
+    console.log('Token:', response.token);
+    console.log('Role:', response.role);
+    this.authService.saveSession(response);
+  },
+  error: (err) => {
+    console.error('Login failed:', err);
+  }
+});
+```
+
+### Registration Request
+
+```typescript
+const registerData: AuthRequest = {
+  username: 'nuevousuario@ejemplo.com',
+  password: 'securepassword'
+};
+
+this.authService.register(registerData).subscribe({
+  next: (message) => {
+    console.log('Registration successful:', message);
+  },
+  error: (err) => {
+    console.error('Registration failed:', err);
+  }
+});
+```
+
+### Saving Session Data
+
+```typescript
+saveSession(response: AuthResponse): void {
+  // Save token using TokenStorageService
+  this.tokenStorage.saveToken(response.token);
+  
+  // Save additional user data
+  localStorage.setItem('username', response.username);
+  localStorage.setItem('role', response.role);
+}
+```
+
+### Checking User Role
+
+```typescript
+isAdmin(): boolean {
+  return localStorage.getItem('role') === 'ROLE_ADMIN';
+}
+
+isUser(): boolean {
+  return localStorage.getItem('role') === 'ROLE_USER';
+}
+```
+
+## Related Types
+
+- See [AuthService](/api/services/auth-service) for authentication methods
+- See [TokenStorageService](/api/services/token-storage-service) for token management
+
+## Notes
+
+<Note>
+  Always transmit authentication credentials over HTTPS to ensure security.
+</Note>
+
+<Warning>
+  Store tokens securely and never expose them in console logs in production environments.
+</Warning>

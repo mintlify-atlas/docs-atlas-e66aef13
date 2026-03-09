@@ -1,0 +1,211 @@
+---
+title: 'Book Catalog'
+description: 'Browse and request loans from the virtual library catalog'
+icon: 'book-open'
+---
+
+## Overview
+
+The Book Catalog feature provides users with an interactive interface to browse available books in the virtual library. Users can view book details including cover images, authors, genres, publication years, and availability status. The catalog also enables users to submit loan requests directly from the interface.
+
+<Note>
+The catalog automatically displays real-time availability status. Only available books can be requested for loans.
+</Note>
+
+## Component Architecture
+
+The catalog is implemented in the `CatalogoComponent` located at:
+- **TypeScript**: `src/app/features/catalogo/catalogo.ts:14`
+- **Template**: `src/app/features/catalogo/catalogo.html`
+
+### Key Dependencies
+
+```typescript
+import { LibroService } from '../../core/services/libro';
+import { PrestamoService } from '../../core/services/prestamo';
+import { Libro } from '../../core/models/libro';
+```
+
+## User Workflow
+
+<Steps>
+  <Step title="View Catalog">
+    Navigate to the catalog page to see all books displayed in a responsive card grid layout
+  </Step>
+  
+  <Step title="Browse Books">
+    Review book information including title, authors, genre, publication year, and cover image
+  </Step>
+  
+  <Step title="Check Availability">
+    Each book displays a badge indicating "Disponible" (Available) or "Agotado" (Out of Stock)
+  </Step>
+  
+  <Step title="Request Loan">
+    Click "Solicitar Préstamo" button on available books to submit a loan request
+  </Step>
+  
+  <Step title="Confirmation">
+    Confirm the request in the popup dialog. The system will notify you upon successful submission
+  </Step>
+</Steps>
+
+## Core Functionality
+
+### Loading Books
+
+The component loads all books on initialization using the `LibroService`:
+
+```typescript
+ngOnInit(): void {
+  this.cargarLibros();
+}
+
+cargarLibros(): void {
+  this.libroService.getAll().subscribe({
+    next: (data) => {
+      this.libros = data;
+      this.loading = false;
+    },
+    error: (err) => {
+      console.error(err);
+      this.loading = false;
+    },
+  });
+}
+```
+
+**Source**: `catalogo.ts:21-36`
+
+### Loan Request Submission
+
+Users can request loans for available books with built-in confirmation:
+
+```typescript
+solicitarPrestamo(libro: Libro): void {
+  if (
+    !confirm(`¿Deseas solicitar el préstamo del libro "${libro.titulo}"?`)
+  ) {
+    return;
+  }
+
+  this.prestamoService.solicitar(libro.id).subscribe({
+    next: () => {
+      alert(
+        '✅ Solicitud enviada con éxito. El administrador evaluará tu petición.'
+      );
+    },
+    error: (err) => {
+      console.error(err);
+      alert(err?.error || '❌ Error al solicitar el préstamo');
+    },
+  });
+}
+```
+
+**Source**: `catalogo.ts:38-56`
+
+<Note>
+Loan requests are sent to the backend endpoint `/prestamos/solicitar/{libroId}` and require admin approval before being granted.
+</Note>
+
+## UI Components
+
+### Book Card Layout
+
+Each book is displayed in a Bootstrap card with:
+
+- **Cover Image**: Displays book cover or a default book icon (📘) if no image is available
+- **Genre Badge**: Color-coded badge showing the book's genre
+- **Availability Badge**: Green for "Disponible", red for "Agotado"
+- **Title**: Bold heading with the book title
+- **Authors**: Comma-separated list of author names
+- **Publication Year**: Year of publication or "N/A"
+- **Action Button**: Enabled for available books, disabled for out-of-stock items
+
+### Responsive Grid
+
+The catalog uses a responsive Bootstrap grid:
+
+```html
+<div class="row row-cols-1 row-cols-md-3 g-4" *ngIf="!loading">
+  <div class="col" *ngFor="let libro of libros">
+    <!-- Book card content -->
+  </div>
+</div>
+```
+
+**Source**: `catalogo.html:10-71`
+
+### Loading State
+
+A spinner displays while books are being fetched:
+
+```html
+<div *ngIf="loading" class="text-center py-5">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Cargando...</span>
+  </div>
+</div>
+```
+
+**Source**: `catalogo.html:4-8`
+
+## API Integration
+
+<CardGroup cols={2}>
+  <Card title="GET /libros" icon="list">
+    Fetches all books in the library with their associated authors, genres, and availability status
+  </Card>
+  
+  <Card title="POST /prestamos/solicitar/{libroId}" icon="paper-plane">
+    Submits a loan request for a specific book, creating a pending loan record for admin review
+  </Card>
+</CardGroup>
+
+## Data Model
+
+The catalog works with the `Libro` model:
+
+```typescript
+interface Libro {
+  id: number;
+  titulo: string;
+  portada: string;          // Cover image URL
+  anioPublicacion: number;
+  disponible: boolean;
+  genero: {
+    id: number;
+    nombre: string;
+  };
+  autores: Array<{
+    id: number;
+    nombre: string;
+  }>;
+}
+```
+
+## Features Summary
+
+<CardGroup cols={2}>
+  <Card title="Visual Browsing" icon="images">
+    Grid layout with book covers, badges, and metadata for easy scanning
+  </Card>
+  
+  <Card title="Real-time Availability" icon="signal">
+    Dynamic availability status prevents requests for unavailable books
+  </Card>
+  
+  <Card title="One-Click Requests" icon="hand-pointer">
+    Simple workflow to request loans with confirmation dialogs
+  </Card>
+  
+  <Card title="Responsive Design" icon="mobile">
+    Adapts to different screen sizes with Bootstrap responsive grid
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Loan Management](/features/loans) - Admin panel for approving/rejecting loan requests
+- [Admin Panel](/features/admin-panel) - Manage books, authors, and genres in the catalog

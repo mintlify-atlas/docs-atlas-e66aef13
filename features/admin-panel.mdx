@@ -1,0 +1,561 @@
+---
+title: 'Admin Panel'
+description: 'Comprehensive administrative tools for managing books, authors, and genres'
+icon: 'shield'
+---
+
+## Overview
+
+The Admin Panel provides authorized administrators with complete CRUD (Create, Read, Update, Delete) functionality for managing the library's core entities: books, authors, and genres. The panel features separate management interfaces for each entity with form-based editing and list views.
+
+<Note>
+Admin features are protected by role-based access control. Only users with ADMIN role can access these management interfaces.
+</Note>
+
+## Management Modules
+
+The admin panel consists of three primary modules:
+
+<CardGroup cols={3}>
+  <Card title="Book Management" icon="book">
+    Create, edit, and delete books with author and genre associations
+  </Card>
+  
+  <Card title="Author Management" icon="user-pen">
+    Manage author profiles with names and photo URLs
+  </Card>
+  
+  <Card title="Genre Management" icon="tags">
+    Organize books by creating and managing genre categories
+  </Card>
+</CardGroup>
+
+## Book Management
+
+### Components
+
+- **List View**: `src/app/features/libros/libro-list/libro-list.ts:14`
+- **Form View**: `src/app/features/libros/libro-form/libro-form.ts:23`
+- **Service**: `src/app/core/services/libro.ts:10`
+
+### Book List Features
+
+The `LibroListComponent` displays all books with management actions:
+
+```typescript
+export class LibroListComponent implements OnInit {
+  private libroService = inject(LibroService);
+  libros: Libro[] = [];
+
+  ngOnInit(): void {
+    this.cargarLibros();
+  }
+
+  cargarLibros(): void {
+    this.libroService.getAll().subscribe({
+      next: (data) => {
+        this.libros = data;
+        console.log('Libros cargados:', data);
+      },
+      error: (err) => {
+        console.error('Error al cargar libros:', err);
+      },
+    });
+  }
+}
+```
+
+**Source**: `libro-list.ts:14-33`
+
+### Deleting Books
+
+Admins can remove books with confirmation:
+
+```typescript
+eliminarLibro(id: number): void {
+  if (confirm('¿Estás seguro de eliminar este libro?')) {
+    this.libroService.delete(id).subscribe({
+      next: () => {
+        this.cargarLibros();
+        alert('Libro eliminado correctamente');
+      },
+      error: (err) => {
+        console.error('Error al eliminar:', err);
+        alert('No se pudo eliminar el libro.');
+      },
+    });
+  }
+}
+```
+
+**Source**: `libro-list.ts:35-50`
+
+### Book Form
+
+The `LibroFormComponent` handles both creation and editing with complex relationships:
+
+<Steps>
+  <Step title="Load Dependencies">
+    Fetch available authors and genres for dropdown selection
+  </Step>
+  
+  <Step title="Populate Form">
+    If editing, load existing book data including associated authors and genre
+  </Step>
+  
+  <Step title="Validate Input">
+    Ensure title, genre, and at least one author are selected
+  </Step>
+  
+  <Step title="Submit">
+    Create new book or update existing one with proper entity references
+  </Step>
+</Steps>
+
+#### Form Initialization
+
+```typescript
+export class LibroFormComponent implements OnInit {
+  private libroService = inject(LibroService);
+  private autorService = inject(AutorService);
+  private generoService = inject(GeneroService);
+
+  listaAutores: Autor[] = [];
+  listaGeneros: Genero[] = [];
+  
+  selectedGeneroId: number | null = null;
+  selectedAutoresIds: number[] = [];
+
+  libro: Libro = {
+    id: 0,
+    titulo: '',
+    portada: '',
+    anioPublicacion: new Date().getFullYear(),
+    disponible: true,
+    genero: { id: 0, nombre: '' },
+    autores: [],
+  };
+
+  isEditing: boolean = false;
+}
+```
+
+**Source**: `libro-form.ts:23-50`
+
+#### Loading Dropdown Data
+
+```typescript
+cargarListas(): void {
+  // Cargar Generos
+  this.generoService.getAll().subscribe({
+    next: (data) => (this.listaGeneros = data),
+    error: (err) => console.error('Error cargando géneros', err),
+  });
+
+  // Cargar Autores
+  this.autorService.getAll().subscribe({
+    next: (data) => (this.listaAutores = data),
+    error: (err) => console.error('Error cargando autores', err),
+  });
+}
+```
+
+**Source**: `libro-form.ts:64-76`
+
+#### Form Submission with Validation
+
+```typescript
+onSubmit(): void {
+  // Validaciones
+  if (!this.libro.titulo.trim()) {
+    alert('El título es obligatorio');
+    return;
+  }
+  if (!this.selectedGeneroId) {
+    alert('Debes seleccionar un género');
+    return;
+  }
+  if (this.selectedAutoresIds.length === 0) {
+    alert('Debes seleccionar al menos un autor');
+    return;
+  }
+
+  const libroParaEnviar = {
+    ...this.libro,
+    genero: { id: this.selectedGeneroId },
+    autores: this.selectedAutoresIds.map((id) => ({ id: Number(id) })),
+  };
+
+  if (!this.isEditing) {
+    delete (libroParaEnviar as any).id;
+  }
+
+  // Enviar
+  if (this.isEditing) {
+    this.libroService.update(this.libro.id, libroParaEnviar).subscribe({
+      next: () => {
+        alert('Libro actualizado correctamente');
+        this.router.navigate(['/libros']);
+      },
+      error: (err) => alert('Error al actualizar'),
+    });
+  } else {
+    this.libroService.create(libroParaEnviar).subscribe({
+      next: () => {
+        alert('Libro creado correctamente');
+        this.router.navigate(['/libros']);
+      },
+      error: (err) => alert('Error al crear'),
+    });
+  }
+}
+```
+
+**Source**: `libro-form.ts:97-149`
+
+### Book Service API
+
+```typescript
+export class LibroService {
+  private apiUrl = `${environment.apiUrl}/libros`;
+
+  getAll(): Observable<Libro[]>
+  getById(id: number): Observable<Libro>
+  create(libro: any): Observable<Libro>
+  update(id: number, libro: any): Observable<Libro>
+  delete(id: number): Observable<any>
+}
+```
+
+**Source**: `libro.ts:10-40`
+
+## Author Management
+
+### Components
+
+- **List View**: `src/app/features/autores/autor-list/autor-list.ts:14`
+- **Form View**: `src/app/features/autores/autor-form/autor-form.ts:14`
+- **Service**: `src/app/core/services/autor.ts:10`
+
+### Author Form
+
+The author form is simpler, requiring only name and optional photo URL:
+
+```typescript
+export class AutorFormComponent implements OnInit {
+  private autorService = inject(AutorService);
+  private router = inject(Router);
+
+  autor: Autor = {
+    id: 0,
+    nombre: '',
+    urlFoto: '',
+  };
+
+  isEditing: boolean = false;
+
+  onSubmit(): void {
+    if (!this.autor.nombre.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+
+    if (this.isEditing) {
+      this.autorService.update(this.autor.id, this.autor).subscribe({
+        next: () => {
+          alert('Autor actualizado correctamente');
+          this.router.navigate(['/autores']);
+        },
+        error: (err) => alert('Error al actualizar el autor.'),
+      });
+    } else {
+      const autorParaGuardar = {
+        nombre: this.autor.nombre,
+        urlFoto: this.autor.urlFoto,
+      };
+
+      this.autorService.create(autorParaGuardar as any).subscribe({
+        next: () => {
+          alert('Autor creado correctamente');
+          this.router.navigate(['/autores']);
+        },
+        error: (err) => alert('Error al crear el autor.'),
+      });
+    }
+  }
+}
+```
+
+**Source**: `autor-form.ts:14-91`
+
+### Deleting Authors
+
+```typescript
+eliminarAutor(id: number): void {
+  if (confirm('¿Estás seguro de eliminar este autor?')) {
+    this.autorService.delete(id).subscribe({
+      next: () => {
+        this.cargarAutores();
+      },
+      error: (err) => {
+        console.error('Error al eliminar:', err);
+        alert(
+          'No se pudo eliminar el autor (quizás tiene libros asociados).'
+        );
+      },
+    });
+  }
+}
+```
+
+**Source**: `autor-list.ts:35-49`
+
+<Note>
+Deleting authors with associated books will fail due to database constraints. The system alerts users when deletion is blocked by existing relationships.
+</Note>
+
+### Author Service API
+
+```typescript
+export class AutorService {
+  private apiUrl = `${environment.apiUrl}/autores`;
+
+  getAll(): Observable<Autor[]>
+  getById(id: number): Observable<Autor>
+  create(autor: Autor): Observable<Autor>
+  update(id: number, autor: Autor): Observable<Autor>
+  delete(id: number): Observable<any>
+}
+```
+
+**Source**: `autor.ts:10-39`
+
+## Genre Management
+
+### Components
+
+- **List View**: `src/app/features/generos/genero-list/genero-list.ts:14`
+- **Form View**: `src/app/features/generos/genero-form/genero-form.ts:15`
+- **Service**: `src/app/core/services/genero.ts:10`
+
+### Genre Form
+
+The genre form is the simplest, requiring only a name:
+
+```typescript
+export class GeneroFormComponent implements OnInit {
+  private generoService = inject(GeneroService);
+  
+  genero: Genero = {
+    id: 0,
+    nombre: '',
+  };
+
+  isEditing: boolean = false;
+
+  onSubmit(): void {
+    if (!this.genero.nombre.trim()) {
+      alert('El nombre del género es obligatorio');
+      return;
+    }
+
+    if (this.isEditing) {
+      this.generoService.update(this.genero.id, this.genero).subscribe({
+        next: () => {
+          alert('Género actualizado correctamente');
+          this.router.navigate(['/generos']);
+        },
+        error: (err) => alert('Error al actualizar el género.'),
+      });
+    } else {
+      const generoParaGuardar = {
+        nombre: this.genero.nombre,
+      };
+
+      this.generoService.create(generoParaGuardar as any).subscribe({
+        next: () => {
+          alert('Género creado correctamente');
+          this.router.navigate(['/generos']);
+        },
+        error: (err) => alert('Error al crear el género.'),
+      });
+    }
+  }
+}
+```
+
+**Source**: `genero-form.ts:15-87`
+
+### Deleting Genres
+
+```typescript
+eliminarGenero(id: number): void {
+  if (confirm('¿Estás seguro de eliminar este género?')) {
+    this.generoService.delete(id).subscribe({
+      next: () => {
+        this.cargarGeneros();
+        alert('Género eliminado correctamente');
+      },
+      error: (err) => {
+        console.error('Error al eliminar:', err);
+        alert(
+          'No se pudo eliminar el género. Es probable que existan libros asociados a él.'
+        );
+      },
+    });
+  }
+}
+```
+
+**Source**: `genero-list.ts:36-53`
+
+### Genre Service API
+
+```typescript
+export class GeneroService {
+  private apiUrl = `${environment.apiUrl}/generos`;
+
+  getAll(): Observable<Genero[]>
+  getById(id: number): Observable<Genero>
+  create(genero: Genero): Observable<Genero>
+  update(id: number, genero: Genero): Observable<Genero>
+  delete(id: number): Observable<any>
+}
+```
+
+**Source**: `genero.ts:10-38`
+
+## Common Patterns
+
+All three management modules share consistent patterns:
+
+### CRUD Operations
+
+<CardGroup cols={2}>
+  <Card title="Create" icon="plus">
+    Navigate to form, fill required fields, submit to create new entity
+  </Card>
+  
+  <Card title="Read" icon="eye">
+    List view displays all entities with key information
+  </Card>
+  
+  <Card title="Update" icon="pen">
+    Edit button loads entity data into form for modification
+  </Card>
+  
+  <Card title="Delete" icon="trash">
+    Delete button with confirmation dialog removes entity
+  </Card>
+</CardGroup>
+
+### Form Modes
+
+All forms support dual modes determined by route parameters:
+
+```typescript
+ngOnInit(): void {
+  const id = this.route.snapshot.paramMap.get('id');
+  
+  if (id) {
+    this.isEditing = true;
+    this.cargarEntidad(Number(id));
+  } else {
+    this.isEditing = false;
+  }
+}
+```
+
+- **Create Mode**: No ID parameter, form displays empty
+- **Edit Mode**: ID parameter present, form loads existing data
+
+### Navigation Structure
+
+Common routing pattern for each module:
+
+- `/libros` - Book list
+- `/libros/new` - Create book
+- `/libros/edit/:id` - Edit book
+
+- `/autores` - Author list
+- `/autores/new` - Create author
+- `/autores/edit/:id` - Edit author
+
+- `/generos` - Genre list
+- `/generos/new` - Create genre
+- `/generos/edit/:id` - Edit genre
+
+## Data Relationships
+
+### Entity Relationships
+
+```
+Libro (Book)
+  ├─ genero: Genero (Many-to-One)
+  └─ autores: Autor[] (Many-to-Many)
+
+Autor (Author)
+  └─ libros: Libro[] (Many-to-Many)
+
+Genero (Genre)
+  └─ libros: Libro[] (One-to-Many)
+```
+
+### Referential Integrity
+
+The system enforces referential integrity:
+
+- Deleting an author with associated books fails
+- Deleting a genre with associated books fails
+- Books can only reference existing authors and genres
+
+## API Endpoints Summary
+
+### Books
+
+- `GET /libros` - List all books
+- `GET /libros/{id}` - Get book by ID
+- `POST /libros` - Create book
+- `PUT /libros/{id}` - Update book
+- `DELETE /libros/{id}` - Delete book
+
+### Authors
+
+- `GET /autores` - List all authors
+- `GET /autores/{id}` - Get author by ID
+- `POST /autores` - Create author
+- `PUT /autores/{id}` - Update author
+- `DELETE /autores/{id}` - Delete author
+
+### Genres
+
+- `GET /generos` - List all genres
+- `GET /generos/{id}` - Get genre by ID
+- `POST /generos` - Create genre
+- `PUT /generos/{id}` - Update genre
+- `DELETE /generos/{id}` - Delete genre
+
+## Features Summary
+
+<CardGroup cols={2}>
+  <Card title="Complete CRUD" icon="database">
+    Full create, read, update, delete operations for all entities
+  </Card>
+  
+  <Card title="Relationship Management" icon="link">
+    Handle complex many-to-many and one-to-many relationships
+  </Card>
+  
+  <Card title="Form Validation" icon="circle-check">
+    Client-side validation ensures data integrity before submission
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation">
+    User-friendly error messages for constraint violations
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Book Catalog](/features/catalog) - Public-facing book browsing interface
+- [Loan Management](/features/loans) - Approve and reject loan requests

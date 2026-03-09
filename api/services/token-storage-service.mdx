@@ -1,0 +1,375 @@
+---
+title: 'TokenStorageService'
+description: 'Manages JWT token storage and authentication state in localStorage'
+---
+
+## Overview
+
+The `TokenStorageService` is a utility service that manages JWT (JSON Web Token) authentication tokens in the browser's localStorage. It provides methods to save, retrieve, and remove tokens, as well as check authentication status.
+
+**Location**: `src/app/core/services/token-storage.service.ts`
+
+## Constructor
+
+```typescript
+constructor() {}
+```
+
+No dependencies required. Uses browser's native `window.localStorage` API.
+
+## Constants
+
+<ParamField path="TOKEN_KEY" type="string" default="'auth-token'">
+  The localStorage key used to store the JWT token
+</ParamField>
+
+## Methods
+
+### saveToken()
+
+Saves the JWT token to localStorage.
+
+```typescript
+saveToken(token: string): void
+```
+
+<ParamField path="token" type="string" required>
+  The JWT token string to store
+</ParamField>
+
+**Returns**: `void`
+
+**Behavior**:
+1. Removes any existing token from localStorage
+2. Saves the new token to localStorage with key `'auth-token'`
+
+**Example:**
+
+```typescript
+const jwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+this.tokenStorage.saveToken(jwtToken);
+console.log('Token saved successfully');
+```
+
+**Use Case**: Called by AuthService after successful login
+
+---
+
+### getToken()
+
+Retrieves the JWT token from localStorage.
+
+```typescript
+getToken(): string | null
+```
+
+**Returns**: `string | null` - The stored JWT token, or `null` if not found
+
+**Example:**
+
+```typescript
+const token = this.tokenStorage.getToken();
+
+if (token) {
+  console.log('User is authenticated');
+  // Use token for API requests
+} else {
+  console.log('No token found - user not authenticated');
+  this.router.navigate(['/login']);
+}
+```
+
+**Use Case**: 
+- Retrieving token for HTTP request headers
+- Checking if user is logged in
+- Used by AuthInterceptor to add token to API requests
+
+---
+
+### signOut()
+
+Removes the JWT token from localStorage, effectively logging out the user.
+
+```typescript
+signOut(): void
+```
+
+**Returns**: `void`
+
+**Behavior**: Removes the token from localStorage using the `TOKEN_KEY`
+
+**Example:**
+
+```typescript
+onLogout() {
+  this.tokenStorage.signOut();
+  console.log('User logged out');
+  this.router.navigate(['/login']);
+}
+```
+
+**Use Case**: Called by AuthService.logout() to clear authentication data
+
+---
+
+### isLoggedIn()
+
+Checks whether a user is currently authenticated.
+
+```typescript
+isLoggedIn(): boolean
+```
+
+**Returns**: `boolean` - `true` if token exists, `false` otherwise
+
+**Implementation**: Returns `true` if `getToken()` returns a non-null value
+
+**Example:**
+
+```typescript
+if (this.tokenStorage.isLoggedIn()) {
+  // Show authenticated user features
+  this.showUserMenu = true;
+} else {
+  // Redirect to login
+  this.router.navigate(['/login']);
+}
+```
+
+**Use Case**:
+- Route guards to protect authenticated pages
+- Conditional UI rendering
+- Navigation logic
+
+## Complete Usage Example
+
+### Integration with AuthService
+
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { TokenStorageService } from '../core/services/token-storage.service';
+import { AuthResponse, AuthRequest } from '../core/models/auth.interface';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  constructor(
+    private http: HttpClient,
+    private tokenStorage: TokenStorageService
+  ) {}
+
+  login(credentials: AuthRequest) {
+    return this.http.post<AuthResponse>('/api/auth/login', credentials)
+      .subscribe({
+        next: (response) => {
+          // Save token using TokenStorageService
+          this.tokenStorage.saveToken(response.token);
+          
+          // Save other user data
+          localStorage.setItem('username', response.username);
+          localStorage.setItem('role', response.role);
+        }
+      });
+  }
+
+  logout() {
+    // Remove token using TokenStorageService
+    this.tokenStorage.signOut();
+    
+    // Remove other user data
+    localStorage.removeItem('username');
+    localStorage.removeItem('role');
+  }
+
+  isAuthenticated(): boolean {
+    return this.tokenStorage.isLoggedIn();
+  }
+}
+```
+
+### Use in HTTP Interceptor
+
+```typescript
+import { Injectable, inject } from '@angular/core';
+import { HttpInterceptor, HttpRequest, HttpHandler } from '@angular/common/http';
+import { TokenStorageService } from '../services/token-storage.service';
+
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  private tokenStorage = inject(TokenStorageService);
+
+  intercept(req: HttpRequest<any>, next: HttpHandler) {
+    // Get token from storage
+    const token = this.tokenStorage.getToken();
+    
+    if (token) {
+      // Clone request and add Authorization header
+      const authReq = req.clone({
+        headers: req.headers.set('Authorization', `Bearer ${token}`)
+      });
+      return next.handle(authReq);
+    }
+    
+    return next.handle(req);
+  }
+}
+```
+
+### Use in Route Guard
+
+```typescript
+import { Injectable, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { TokenStorageService } from '../services/token-storage.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard {
+  private tokenStorage = inject(TokenStorageService);
+  private router = inject(Router);
+
+  canActivate(): boolean {
+    if (this.tokenStorage.isLoggedIn()) {
+      return true;
+    } else {
+      this.router.navigate(['/login']);
+      return false;
+    }
+  }
+}
+```
+
+## Security Considerations
+
+### localStorage vs sessionStorage
+
+This service uses `localStorage` which persists across browser sessions. Consider these security implications:
+
+**Advantages:**
+- Token persists across browser restarts
+- Better user experience (stay logged in)
+
+**Disadvantages:**
+- Vulnerable to XSS attacks if application has XSS vulnerabilities
+- Token persists until explicitly removed
+
+**Alternative Implementation with sessionStorage:**
+
+```typescript
+// For session-only storage (more secure)
+saveToken(token: string): void {
+  window.sessionStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.setItem(TOKEN_KEY, token);
+}
+
+getToken(): string | null {
+  return window.sessionStorage.getItem(TOKEN_KEY);
+}
+```
+
+### Best Practices
+
+1. **Token Expiration**: Implement token refresh logic before expiration
+2. **XSS Protection**: Sanitize all user inputs to prevent XSS attacks
+3. **HTTPS Only**: Always use HTTPS in production to prevent token interception
+4. **Automatic Logout**: Clear tokens on security-sensitive errors (401, 403)
+
+```typescript
+// Example: Auto-logout on 401 error in HTTP interceptor
+if (error.status === 401) {
+  this.tokenStorage.signOut();
+  this.router.navigate(['/login']);
+}
+```
+
+## Token Format
+
+The service stores JWT tokens in standard format:
+
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+The token consists of three parts separated by dots:
+1. **Header**: Algorithm and token type
+2. **Payload**: User data and claims
+3. **Signature**: Verification signature
+
+## Debugging
+
+Inspect tokens in browser developer tools:
+
+```typescript
+// Check current token in console
+console.log('Current token:', this.tokenStorage.getToken());
+
+// Check localStorage directly
+console.log('localStorage:', window.localStorage.getItem('auth-token'));
+
+// Decode JWT payload (for debugging only - don't trust client-side)
+const token = this.tokenStorage.getToken();
+if (token) {
+  const payload = JSON.parse(atob(token.split('.')[1]));
+  console.log('Token payload:', payload);
+}
+```
+
+## Common Patterns
+
+### Checking Authentication Before Navigation
+
+```typescript
+@Component({
+  selector: 'app-nav',
+  template: `...`
+})
+export class NavComponent {
+  tokenStorage = inject(TokenStorageService);
+
+  navigateToProfile() {
+    if (!this.tokenStorage.isLoggedIn()) {
+      alert('Please login first');
+      return;
+    }
+    this.router.navigate(['/profile']);
+  }
+}
+```
+
+### Conditional Template Rendering
+
+```typescript
+@Component({
+  selector: 'app-header',
+  template: `
+    <div *ngIf="isLoggedIn()">
+      <button (click)="logout()">Logout</button>
+    </div>
+    <div *ngIf="!isLoggedIn()">
+      <a routerLink="/login">Login</a>
+    </div>
+  `
+})
+export class HeaderComponent {
+  tokenStorage = inject(TokenStorageService);
+
+  isLoggedIn(): boolean {
+    return this.tokenStorage.isLoggedIn();
+  }
+
+  logout() {
+    this.tokenStorage.signOut();
+    window.location.href = '/login';
+  }
+}
+```
+
+## See Also
+
+- [AuthService](/api/services/auth-service) - Uses TokenStorageService for authentication
+- [AuthInterceptor](/api/interceptors/auth-interceptor) - Adds tokens to HTTP requests
+- [AuthGuard](/api/guards/auth-guard) - Protects routes using token validation

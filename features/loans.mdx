@@ -1,0 +1,336 @@
+---
+title: 'Loan Request System'
+description: 'Manage book loan requests with approval and rejection workflows'
+icon: 'handshake'
+---
+
+## Overview
+
+The Loan Request System enables administrators to review, approve, or reject book loan requests submitted by library users. The system tracks loan status through a state-based workflow (PENDIENTE → APROBADO/RECHAZADO) and manages book availability accordingly.
+
+<Note>
+When a loan is approved, the associated book's availability is automatically updated to prevent duplicate loans.
+</Note>
+
+## Component Architecture
+
+The loan management interface is implemented in `PrestamoListComponent`:
+
+- **TypeScript**: `src/app/features/prestamos/prestamo-list/prestamo-list.ts:13`
+- **Template**: `src/app/features/prestamos/prestamo-list/prestamo-list.html`
+- **Service**: `src/app/core/services/prestamo.ts:10`
+
+### Dependencies
+
+```typescript
+import { PrestamoService } from '../../../core/services/prestamo';
+import { Prestamo } from '../../../core/models/prestamo';
+```
+
+## Admin Workflow
+
+<Steps>
+  <Step title="View Pending Requests">
+    Access the loan management panel to see all loan requests sorted by ID (newest first)
+  </Step>
+  
+  <Step title="Review Request Details">
+    Check the user, book title, request date, and current status for each loan
+  </Step>
+  
+  <Step title="Approve or Reject">
+    For pending requests, click "✅ Aprobar" to approve or "❌ Rechazar" to deny the loan
+  </Step>
+  
+  <Step title="Confirm Action">
+    Confirm your decision in the dialog. The system updates the loan status and book availability
+  </Step>
+  
+  <Step title="View Updated List">
+    The table refreshes automatically to show the new status
+  </Step>
+</Steps>
+
+## Core Functionality
+
+### Loading Loans
+
+The component fetches all loans on initialization:
+
+```typescript
+ngOnInit(): void {
+  this.cargarPrestamos();
+}
+
+cargarPrestamos(): void {
+  this.prestamoService.getAll().subscribe({
+    next: (data) => {
+      // Los PENDIENTES primero
+      this.prestamos = data.sort((a, b) => b.id - a.id);
+    },
+  });
+}
+```
+
+**Source**: `prestamo-list.ts:17-28`
+
+<Note>
+Loans are sorted by ID in descending order to prioritize the newest requests at the top.
+</Note>
+
+### Approving Loans
+
+Administrators can approve pending loan requests:
+
+```typescript
+aprobar(id: number): void {
+  if (
+    confirm('¿Aprobar este préstamo? El libro dejará de estar disponible.')
+  ) {
+    this.prestamoService.aprobar(id).subscribe(() => {
+      alert('Préstamo Aprobado');
+      this.cargarPrestamos();
+    });
+  }
+}
+```
+
+**Source**: `prestamo-list.ts:30-39`
+
+**Side Effects**:
+- Loan status changes from `PENDIENTE` to `APROBADO`
+- Associated book's `disponible` flag is set to `false`
+- Book becomes unavailable for new loan requests
+
+### Rejecting Loans
+
+Administrators can reject loan requests:
+
+```typescript
+rechazar(id: number): void {
+  if (confirm('¿Rechazar solicitud?')) {
+    this.prestamoService.rechazar(id).subscribe(() => {
+      alert('Solicitud Rechazada');
+      this.cargarPrestamos();
+    });
+  }
+}
+```
+
+**Source**: `prestamo-list.ts:41-48`
+
+**Side Effects**:
+- Loan status changes from `PENDIENTE` to `RECHAZADO`
+- Book remains available for other users
+
+## Service API
+
+The `PrestamoService` provides methods for all loan operations:
+
+### Available Methods
+
+```typescript
+// User: Submit a loan request
+solicitar(libroId: number): Observable<any>
+
+// Admin: List all loans
+getAll(): Observable<Prestamo[]>
+
+// User: List my loans
+getMisPrestamos(): Observable<Prestamo[]>
+
+// Admin: Approve a loan
+aprobar(id: number): Observable<any>
+
+// Admin: Reject a loan
+rechazar(id: number): Observable<any>
+```
+
+**Source**: `prestamo.ts:14-50`
+
+## API Endpoints
+
+<CardGroup cols={2}>
+  <Card title="POST /prestamos/solicitar/{libroId}" icon="paper-plane">
+    Submit a new loan request for a specific book (user action)
+  </Card>
+  
+  <Card title="GET /prestamos/todos" icon="list">
+    Retrieve all loan requests (admin only)
+  </Card>
+  
+  <Card title="GET /prestamos/mios" icon="user">
+    Retrieve loans for the authenticated user
+  </Card>
+  
+  <Card title="POST /prestamos/aprobar/{id}" icon="check">
+    Approve a pending loan request (admin only)
+  </Card>
+  
+  <Card title="POST /prestamos/rechazar/{id}" icon="xmark">
+    Reject a pending loan request (admin only)
+  </Card>
+</CardGroup>
+
+## UI Components
+
+### Loan Management Table
+
+The interface displays loans in a structured table:
+
+```html
+<table class="table table-striped table-hover mb-0 align-middle">
+  <thead class="table-dark">
+    <tr>
+      <th>ID</th>
+      <th>Usuario</th>
+      <th>Libro</th>
+      <th>Fecha Solicitud</th>
+      <th>Estado</th>
+      <th class="text-end">Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let p of prestamos">
+      <!-- Loan details -->
+    </tr>
+  </tbody>
+</table>
+```
+
+**Source**: `prestamo-list.html:6-55`
+
+### Status Badges
+
+Loans display color-coded status badges:
+
+```html
+<span
+  class="badge"
+  [ngClass]="{
+    'bg-warning text-dark': p.estado === 'PENDIENTE',
+    'bg-success': p.estado === 'APROBADO',
+    'bg-danger': p.estado === 'RECHAZADO'
+  }"
+>
+  {{ p.estado }}
+</span>
+```
+
+**Source**: `prestamo-list.html:24-35`
+
+- **PENDIENTE**: Yellow badge (requires admin action)
+- **APROBADO**: Green badge (loan granted)
+- **RECHAZADO**: Red badge (loan denied)
+
+### Conditional Actions
+
+Action buttons only appear for pending loans:
+
+```html
+<div *ngIf="p.estado === 'PENDIENTE'">
+  <button
+    class="btn btn-success btn-sm me-2"
+    (click)="aprobar(p.id)"
+  >
+    ✅ Aprobar
+  </button>
+  <button class="btn btn-danger btn-sm" (click)="rechazar(p.id)">
+    ❌ Rechazar
+  </button>
+</div>
+<span *ngIf="p.estado !== 'PENDIENTE'" class="text-muted small">
+  Sin acciones
+</span>
+```
+
+**Source**: `prestamo-list.html:38-51`
+
+## Data Model
+
+The `Prestamo` model includes:
+
+```typescript
+interface Prestamo {
+  id: number;
+  fechaSolicitud: string;  // ISO date string
+  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  usuario: {
+    id: number;
+    username: string;
+  };
+  libro: {
+    id: number;
+    titulo: string;
+  };
+}
+```
+
+## Loan States
+
+The system uses three loan states:
+
+<CardGroup cols={3}>
+  <Card title="PENDIENTE" icon="clock">
+    Initial state when a user submits a loan request. Awaiting admin review.
+  </Card>
+  
+  <Card title="APROBADO" icon="circle-check">
+    Admin has approved the request. Book is now unavailable for other users.
+  </Card>
+  
+  <Card title="RECHAZADO" icon="circle-xmark">
+    Admin has rejected the request. Book remains available.
+  </Card>
+</CardGroup>
+
+## Integration Points
+
+### With Book Catalog
+
+When users browse the catalog (see [Book Catalog](/features/catalog)), they can request loans via the `solicitarPrestamo()` method, which calls:
+
+```typescript
+this.prestamoService.solicitar(libro.id).subscribe({
+  next: () => {
+    alert('✅ Solicitud enviada con éxito. El administrador evaluará tu petición.');
+  },
+  error: (err) => {
+    alert(err?.error || '❌ Error al solicitar el préstamo');
+  },
+});
+```
+
+**Source**: `catalogo.ts:45-54`
+
+### With Book Management
+
+When admins approve a loan, the backend automatically:
+1. Updates the loan status to `APROBADO`
+2. Sets the book's `disponible` field to `false`
+3. Prevents the book from appearing as available in the catalog
+
+## Features Summary
+
+<CardGroup cols={2}>
+  <Card title="Request Queue" icon="inbox">
+    Centralized view of all loan requests sorted by recency
+  </Card>
+  
+  <Card title="One-Click Approval" icon="bolt">
+    Quick approve/reject actions with confirmation dialogs
+  </Card>
+  
+  <Card title="Status Tracking" icon="list-check">
+    Visual status indicators for pending, approved, and rejected loans
+  </Card>
+  
+  <Card title="Automatic Updates" icon="rotate">
+    Book availability updates automatically when loans are approved
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Book Catalog](/features/catalog) - User interface for browsing and requesting books
+- [Admin Panel](/features/admin-panel) - Manage books, authors, and genres

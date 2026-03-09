@@ -1,0 +1,172 @@
+---
+title: adminGuard
+description: Role-based access guard that restricts routes to admin users only
+---
+
+## Overview
+
+The `adminGuard` is an Angular route guard that implements role-based access control (RBAC) for administrative routes. It verifies that the current user has the `ROLE_ADMIN` role and redirects non-admin users to the catalog page.
+
+## Signature
+
+```typescript
+export const adminGuard: CanActivateFn
+```
+
+### Type Definition
+
+```typescript
+type CanActivateFn = (
+  route: ActivatedRouteSnapshot,
+  state: RouterStateSnapshot
+) => boolean | UrlTree | Observable<boolean | UrlTree> | Promise<boolean | UrlTree>
+```
+
+## Implementation
+
+```typescript
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+
+export const adminGuard: CanActivateFn = (route, state) => {
+  const router = inject(Router);
+
+  // Rol directamente del localStorage
+  const role = localStorage.getItem('role');
+
+  if (role === 'ROLE_ADMIN') {
+    // Es Admin: Pasa adelante
+    return true;
+  } else {
+    // No es Admin: Al catálogo
+    router.navigate(['/catalogo']);
+    return false;
+  }
+};
+```
+
+## Parameters
+
+<ParamField path="route" type="ActivatedRouteSnapshot">
+  Contains information about the route being activated
+</ParamField>
+
+<ParamField path="state" type="RouterStateSnapshot">
+  Contains the router state at a particular moment in time
+</ParamField>
+
+## Return Value
+
+<ResponseField name="return" type="boolean">
+  - `true` - User has `ROLE_ADMIN` role, allow access to the route
+  - `false` - User does not have admin role, redirect to `/catalogo`
+</ResponseField>
+
+## Usage
+
+### Route Configuration
+
+Apply the `adminGuard` to admin-only routes:
+
+```typescript
+import { Routes } from '@angular/router';
+import { adminGuard } from './core/guards/admin-guard';
+import { authGuard } from './core/guards/auth-guard';
+
+export const routes: Routes = [
+  {
+    path: 'libros',
+    loadComponent: () => import('./pages/libros/libros.component'),
+    canActivate: [authGuard, adminGuard]  // Combine with authGuard
+  },
+  {
+    path: 'admin',
+    canActivate: [authGuard, adminGuard],
+    children: [
+      {
+        path: 'usuarios',
+        loadComponent: () => import('./pages/admin/usuarios.component')
+      },
+      {
+        path: 'configuracion',
+        loadComponent: () => import('./pages/admin/configuracion.component')
+      }
+    ]
+  }
+];
+```
+
+### Combining Guards
+
+For maximum security, combine `adminGuard` with `authGuard`:
+
+```typescript
+{
+  path: 'admin-panel',
+  canActivate: [authGuard, adminGuard],  // Check auth first, then role
+  component: AdminPanelComponent
+}
+```
+
+<Note>
+Guards are executed in the order they appear in the `canActivate` array. Always place `authGuard` before `adminGuard` to ensure the user is authenticated before checking their role.
+</Note>
+
+## How It Works
+
+1. **Role Retrieval**: The guard reads the user's role from `localStorage` (`src/app/core/guards/admin-guard.ts:8`)
+2. **Role Validation**: Checks if the role equals `'ROLE_ADMIN'`
+3. **Access Control**:
+   - **Admin User**: Returns `true`, allowing navigation to proceed
+   - **Non-Admin User**: Redirects to `/catalogo` and returns `false`
+
+## Dependencies
+
+- **Router** (`src/app/core/guards/admin-guard.ts:5`): Angular router for navigation
+- **localStorage**: Browser API for retrieving the stored user role
+
+<Warning>
+This guard assumes the user role is stored in `localStorage` with the key `'role'`. Ensure your authentication service properly sets this value during login.
+</Warning>
+
+<Warning>
+The guard does not verify if the user is authenticated. Always combine `adminGuard` with `authGuard` to ensure proper authentication before role checking.
+</Warning>
+
+## When to Use
+
+Use `adminGuard` when you need to:
+
+- Restrict access to administrative features and routes
+- Implement role-based access control (RBAC)
+- Separate user and admin functionality in your application
+- Prevent regular users from accessing management interfaces
+
+For general authentication without role restrictions, see [authGuard](/api/guards/auth-guard).
+
+## Security Considerations
+
+<Warning>
+**Client-side guards are not sufficient for security.** Always validate user roles on the server side for sensitive operations. Guards only control UI navigation and can be bypassed by determined users.
+</Warning>
+
+### Best Practices
+
+1. **Server-Side Validation**: Always validate admin privileges on the backend
+2. **Guard Order**: Place `authGuard` before `adminGuard` in the `canActivate` array
+3. **Token Validation**: Consider implementing token-based role verification instead of relying solely on localStorage
+4. **Fallback Routes**: Ensure non-admin users are redirected to appropriate routes
+
+## Role System
+
+The guard currently recognizes the following role:
+
+- `ROLE_ADMIN` - Full administrative access
+
+To support multiple roles, you would need to modify the guard implementation or create additional role-specific guards.
+
+## Related
+
+- [authGuard](/api/guards/auth-guard) - Base authentication guard
+- [publicGuard](/api/guards/public-guard) - Guard for public/unauthenticated routes
+- [TokenStorageService](/api/services/token-storage-service) - Token and user data management

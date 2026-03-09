@@ -1,0 +1,229 @@
+---
+title: publicGuard
+description: Guard that prevents authenticated users from accessing public routes and redirects them based on role
+---
+
+## Overview
+
+The `publicGuard` is an Angular route guard that protects public routes (like login and registration pages) from authenticated users. It redirects logged-in users to their appropriate dashboard based on their role, preventing them from accessing authentication pages when already authenticated.
+
+## Signature
+
+```typescript
+export const publicGuard: CanActivateFn
+```
+
+### Type Definition
+
+```typescript
+type CanActivateFn = (
+  route: ActivatedRouteSnapshot,
+  state: RouterStateSnapshot
+) => boolean | UrlTree | Observable<boolean | UrlTree> | Promise<boolean | UrlTree>
+```
+
+## Implementation
+
+```typescript
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { TokenStorageService } from '../services/token-storage.service';
+
+export const publicGuard: CanActivateFn = (route, state) => {
+  const tokenStorage = inject(TokenStorageService);
+  const router = inject(Router);
+
+  // Obtiene el token
+  const token = tokenStorage.getToken();
+
+  // Si el usuario está logueado
+  if (token) {
+    // Obtiene el rol guardado en localStorage
+    const role = localStorage.getItem('role');
+
+    // Redirección
+    if (role === 'ROLE_ADMIN') {
+      router.navigate(['/libros']);
+    } else {
+      router.navigate(['/catalogo']);
+    }
+
+    return false; // bloquea acceso a /auth/login
+  }
+
+  // Permite acceso a login/registro
+  return true;
+};
+```
+
+## Parameters
+
+<ParamField path="route" type="ActivatedRouteSnapshot">
+  Contains information about the route being activated
+</ParamField>
+
+<ParamField path="state" type="RouterStateSnapshot">
+  Contains the router state at a particular moment in time
+</ParamField>
+
+## Return Value
+
+<ResponseField name="return" type="boolean">
+  - `true` - User is not authenticated, allow access to public route
+  - `false` - User is authenticated, redirect based on role
+</ResponseField>
+
+## Redirect Behavior
+
+When an authenticated user tries to access a public route, they are redirected based on their role:
+
+| Role | Redirect Destination |
+|------|---------------------|
+| `ROLE_ADMIN` | `/libros` (Books management) |
+| Other roles | `/catalogo` (Public catalog) |
+| No role | `/catalogo` (Public catalog) |
+
+## Usage
+
+### Route Configuration
+
+Apply the `publicGuard` to authentication and public routes:
+
+```typescript
+import { Routes } from '@angular/router';
+import { publicGuard } from './core/guards/public-guard';
+
+export const routes: Routes = [
+  {
+    path: 'auth',
+    canActivate: [publicGuard],
+    children: [
+      {
+        path: 'login',
+        loadComponent: () => import('./pages/auth/login/login.component')
+      },
+      {
+        path: 'registro',
+        loadComponent: () => import('./pages/auth/registro/registro.component')
+      }
+    ]
+  },
+  {
+    path: 'welcome',
+    loadComponent: () => import('./pages/welcome/welcome.component'),
+    canActivate: [publicGuard]
+  }
+];
+```
+
+### Protecting Authentication Routes
+
+The most common use case is protecting login/registration pages:
+
+```typescript
+{
+  path: 'auth/login',
+  component: LoginComponent,
+  canActivate: [publicGuard]  // Redirect if already logged in
+}
+```
+
+## How It Works
+
+1. **Token Check** (`src/app/core/guards/public-guard.ts:10`): Retrieves authentication token from `TokenStorageService`
+2. **Authentication Status**:
+   - **Authenticated** (token exists):
+     - Retrieves user role from `localStorage` (`src/app/core/guards/public-guard.ts:15`)
+     - Redirects to role-specific route
+     - Returns `false` to block access
+   - **Not Authenticated** (no token):
+     - Returns `true` to allow access to the public route
+
+## Dependencies
+
+- **TokenStorageService** (`src/app/core/guards/public-guard.ts:6`): Service for managing authentication tokens
+- **Router** (`src/app/core/guards/public-guard.ts:7`): Angular router for navigation
+- **localStorage**: Browser API for retrieving user role
+
+<Note>
+This guard implements the inverse logic of `authGuard`. While `authGuard` protects authenticated routes, `publicGuard` protects public routes from authenticated users.
+</Note>
+
+## When to Use
+
+Use `publicGuard` when you need to:
+
+- Prevent logged-in users from accessing login/registration pages
+- Implement automatic redirection based on user role after login
+- Create landing pages that should only be visible to unauthenticated users
+- Improve user experience by avoiding unnecessary authentication steps
+
+## User Experience Benefits
+
+<Note>
+**Better UX**: If a user tries to access `/auth/login` while already logged in, they are automatically redirected to their appropriate dashboard instead of seeing the login form unnecessarily.
+</Note>
+
+### Example Scenarios
+
+1. **User bookmarks login page**: An authenticated user who bookmarked `/auth/login` will be automatically redirected to their dashboard instead of seeing the login form
+
+2. **Back button after login**: If a user presses the back button after logging in, they won't return to the login page but will be redirected appropriately
+
+3. **Direct URL access**: Authenticated users cannot manually navigate to authentication pages by typing the URL
+
+## Role-Based Redirection
+
+The guard implements smart redirection based on user roles:
+
+```typescript
+if (role === 'ROLE_ADMIN') {
+  router.navigate(['/libros']);      // Admin → Books management
+} else {
+  router.navigate(['/catalogo']);    // Regular user → Catalog
+}
+```
+
+This ensures users land on the most relevant page for their role.
+
+<Warning>
+The redirect destinations are hardcoded in the guard. If you need to change the default landing pages for different roles, you'll need to modify the guard implementation at `src/app/core/guards/public-guard.ts:18-22`.
+</Warning>
+
+## Complete Authentication Flow
+
+Combine all three guards for a complete authentication system:
+
+```typescript
+export const routes: Routes = [
+  // Public routes - only for unauthenticated users
+  {
+    path: 'auth',
+    canActivate: [publicGuard],
+    children: [
+      { path: 'login', component: LoginComponent },
+      { path: 'registro', component: RegistroComponent }
+    ]
+  },
+  
+  // User routes - requires authentication
+  {
+    path: 'catalogo',
+    component: CatalogoComponent,
+    canActivate: [authGuard]
+  },
+  
+  // Admin routes - requires authentication + admin role
+  {
+    path: 'libros',
+    component: LibrosComponent,
+    canActivate: [authGuard, adminGuard]
+  }
+];
+```
+
+## Related
+
+- [authGuard](/api/guards/auth-guard) - Protects routes requiring authentication
+- [adminGuard](/api/guards/admin-guard) - Protects routes requiring admin role
+- [TokenStorageService](/api/services/token-storage-service) - Token management service

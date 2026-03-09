@@ -1,0 +1,351 @@
+---
+title: 'CI/CD Pipeline'
+description: 'Automated deployment with GitHub Actions and Docker Hub'
+---
+
+## Overview
+
+The Biblioteca Virtual Frontend uses GitHub Actions to automate the build and deployment process. The CI/CD pipeline automatically builds Docker images and pushes them to Docker Hub whenever changes are pushed to the main branch.
+
+## GitHub Actions Workflow
+
+The CI/CD pipeline is defined in `.github/workflows/docker-frontend.yml`:
+
+```yaml
+name: Frontend CI/CD - Docker Hub
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:latest .
+
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:latest
+```
+
+## Pipeline Stages
+
+<Steps>
+  <Step title="Trigger on Push">
+    The workflow triggers automatically when code is pushed to the `main` branch.
+  </Step>
+  
+  <Step title="Checkout Repository">
+    Uses `actions/checkout@v4` to clone the repository code.
+  </Step>
+  
+  <Step title="Login to Docker Hub">
+    Authenticates with Docker Hub using stored secrets.
+  </Step>
+  
+  <Step title="Build Docker Image">
+    Builds the Docker image using the multi-stage Dockerfile.
+  </Step>
+  
+  <Step title="Push to Docker Hub">
+    Pushes the built image to Docker Hub registry.
+  </Step>
+</Steps>
+
+## Required Secrets
+
+Configure these secrets in your GitHub repository settings:
+
+### DOCKERHUB_USERNAME
+
+Your Docker Hub username.
+
+**Settings Path**: `Repository > Settings > Secrets and variables > Actions > New repository secret`
+
+```
+Name: DOCKERHUB_USERNAME
+Value: your-dockerhub-username
+```
+
+### DOCKERHUB_TOKEN
+
+Docker Hub access token for authentication.
+
+**Settings Path**: `Repository > Settings > Secrets and variables > Actions > New repository secret`
+
+```
+Name: DOCKERHUB_TOKEN
+Value: your-dockerhub-access-token
+```
+
+<Warning>
+  Never commit Docker Hub credentials to your repository. Always use GitHub Secrets.
+</Warning>
+
+## Creating a Docker Hub Access Token
+
+<Steps>
+  <Step title="Login to Docker Hub">
+    Navigate to [hub.docker.com](https://hub.docker.com) and sign in.
+  </Step>
+  
+  <Step title="Account Settings">
+    Go to Account Settings > Security.
+  </Step>
+  
+  <Step title="Generate Token">
+    Click "New Access Token" and provide a description.
+  </Step>
+  
+  <Step title="Copy Token">
+    Copy the generated token immediately (it won't be shown again).
+  </Step>
+  
+  <Step title="Add to GitHub">
+    Add the token as `DOCKERHUB_TOKEN` in GitHub repository secrets.
+  </Step>
+</Steps>
+
+## Workflow Customization
+
+### Build with Tags
+
+Add version tags to your Docker images:
+
+```yaml
+- name: Build Docker image
+  run: |
+    docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:latest .
+    docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:${{ github.sha }} .
+
+- name: Push Docker image
+  run: |
+    docker push ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:latest
+    docker push ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:${{ github.sha }}
+```
+
+### Add Testing Step
+
+Include tests before building:
+
+```yaml
+- name: Setup Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+
+- name: Install dependencies
+  run: npm ci
+
+- name: Run tests
+  run: npm test -- --watch=false --browsers=ChromeHeadless
+
+- name: Build Docker image
+  run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:latest .
+```
+
+### Multi-Environment Deployment
+
+Deploy to different environments based on branches:
+
+```yaml
+on:
+  push:
+    branches: 
+      - main
+      - staging
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set environment
+        id: set-env
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "env=production" >> $GITHUB_OUTPUT
+          else
+            echo "env=staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/biblioteca-virtual-frontend:${{ steps.set-env.outputs.env }} .
+```
+
+## Monitoring Pipeline Execution
+
+### View Workflow Runs
+
+Navigate to your repository on GitHub:
+
+```
+Repository > Actions > Frontend CI/CD - Docker Hub
+```
+
+### Check Build Logs
+
+Click on a workflow run to view detailed logs for each step.
+
+### Workflow Status Badge
+
+Add a status badge to your README:
+
+```markdown
+![CI/CD Status](https://github.com/your-username/your-repo/workflows/Frontend%20CI/CD%20-%20Docker%20Hub/badge.svg)
+```
+
+## Deployment Options
+
+### Pull and Run Latest Image
+
+After the pipeline completes, pull the latest image:
+
+```bash
+docker pull your-username/biblioteca-virtual-frontend:latest
+docker run -d -p 80:80 your-username/biblioteca-virtual-frontend:latest
+```
+
+### Auto-Deploy with Watchtower
+
+Use Watchtower to automatically update running containers:
+
+```yaml
+version: '3.8'
+
+services:
+  frontend:
+    image: your-username/biblioteca-virtual-frontend:latest
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300
+```
+
+<Info>
+  Watchtower checks for image updates every 5 minutes (300 seconds) and automatically restarts containers with the latest version.
+</Info>
+
+## Advanced CI/CD Patterns
+
+### Cache Dependencies
+
+Speed up builds by caching npm dependencies:
+
+```yaml
+- name: Cache node modules
+  uses: actions/cache@v3
+  with:
+    path: ~/.npm
+    key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    restore-keys: |
+      ${{ runner.os }}-node-
+```
+
+### Parallel Jobs
+
+Run tests and linting in parallel:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: npm test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run linter
+        run: npm run lint
+
+  build:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and push
+        run: docker build and push...
+```
+
+### Notifications
+
+Send notifications on build completion:
+
+```yaml
+- name: Notify on success
+  if: success()
+  uses: 8398a7/action-slack@v3
+  with:
+    status: ${{ job.status }}
+    webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+## Troubleshooting
+
+### Authentication Failure
+
+If login to Docker Hub fails:
+
+1. Verify `DOCKERHUB_USERNAME` is correct
+2. Ensure `DOCKERHUB_TOKEN` is valid and has not expired
+3. Check token permissions
+
+### Build Failure
+
+Common issues:
+
+- **Out of memory**: Increase runner resources
+- **Dependency errors**: Clear cache and rebuild
+- **Dockerfile syntax**: Validate Dockerfile locally
+
+### Push Failure
+
+If pushing to Docker Hub fails:
+
+1. Verify repository exists on Docker Hub
+2. Check authentication token permissions
+3. Ensure image name matches Docker Hub repository
+
+## Best Practices
+
+1. **Use specific action versions**: Pin to specific versions (e.g., `@v4`)
+2. **Secure secrets**: Never log or expose secret values
+3. **Tag images**: Use semantic versioning for production releases
+4. **Test locally**: Validate builds locally before pushing
+5. **Monitor workflows**: Set up notifications for failures
+6. **Cache dependencies**: Speed up builds with caching
+7. **Run tests**: Always test before deploying
+
+## Manual Workflow Trigger
+
+Enable manual workflow dispatch:
+
+```yaml
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+```
+
+Then trigger manually from GitHub Actions tab.

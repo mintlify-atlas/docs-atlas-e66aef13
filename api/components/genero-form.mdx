@@ -1,0 +1,243 @@
+---
+title: GeneroFormComponent
+description: Component for creating and editing literary genre records
+---
+
+## Overview
+
+The `GeneroFormComponent` provides a simple form interface for administrators to create new literary genres or edit existing genre names.
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-genero-form',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './genero-form.html',
+  styleUrls: ['./genero-form.css'],
+})
+```
+
+**Selector:** `app-genero-form`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+- `FormsModule` - Template-driven forms support
+- `RouterLink` - Router navigation
+
+**Template:** `./genero-form.html`
+
+## Properties
+
+### genero
+
+```typescript
+genero: Genero = {
+  id: 0,
+  nombre: '',
+}
+```
+
+The genre object being created or edited. Initialized with default values:
+- `id`: Set to 0 for new genres
+- `nombre`: Empty string for genre name
+
+### isEditing
+
+```typescript
+isEditing: boolean = false
+```
+
+Indicates whether the form is in edit mode (`true`) or create mode (`false`).
+
+## Injected Services
+
+```typescript
+private generoService = inject(GeneroService)
+private router = inject(Router)
+private route = inject(ActivatedRoute)
+```
+
+- **GeneroService** - Genre CRUD operations
+- **Router** - Navigation after save
+- **ActivatedRoute** - Reads route parameters to detect edit mode
+
+## Lifecycle Hooks
+
+### ngOnInit
+
+```typescript
+ngOnInit(): void {
+  const id = this.route.snapshot.paramMap.get('id');
+
+  if (id) {
+    // MODO EDICIÓN
+    this.isEditing = true;
+    this.cargarGenero(Number(id));
+  } else {
+    // MODO CREACIÓN
+    this.isEditing = false;
+  }
+}
+```
+
+1. Checks if an `id` parameter exists in the route
+2. If `id` exists:
+   - Sets `isEditing` to `true` (edit mode)
+   - Loads the genre data by calling `cargarGenero()`
+3. If no `id`:
+   - Sets `isEditing` to `false` (create mode)
+
+## Methods
+
+### cargarGenero
+
+```typescript
+cargarGenero(id: number): void
+```
+
+Loads a specific genre for editing:
+
+1. Calls `GeneroService.getById(id)`
+2. Populates the `genero` object with the response data
+3. Logs errors to console if any occur
+
+**Parameters:**
+- `id` - The numeric ID of the genre to load
+
+### onSubmit
+
+```typescript
+onSubmit(): void
+```
+
+Handles form submission for both create and update operations:
+
+**Validation:**
+- Checks that `nombre` is not empty (after trimming whitespace)
+- Shows alert "El nombre del género es obligatorio" if validation fails
+
+**Update Mode (isEditing = true):**
+1. Calls `GeneroService.update()` with the genre ID and full `genero` object
+2. On success:
+   - Shows alert "Género actualizado correctamente"
+   - Navigates to `/generos`
+3. On error:
+   - Logs error to console
+   - Shows alert "Error al actualizar el género."
+
+**Create Mode (isEditing = false):**
+1. Creates `generoParaGuardar` object with only `nombre` (excludes `id`)
+2. Calls `GeneroService.create()` with the data
+3. On success:
+   - Shows alert "Género creado correctamente"
+   - Navigates to `/generos`
+4. On error:
+   - Logs error to console
+   - Shows alert "Error al crear el género."
+
+## Full Source Code
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { GeneroService } from '../../../core/services/genero';
+import { Genero } from '../../../core/models/genero';
+
+@Component({
+  selector: 'app-genero-form',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './genero-form.html',
+  styleUrls: ['./genero-form.css'],
+})
+export class GeneroFormComponent implements OnInit {
+  private generoService = inject(GeneroService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  // Inicializamos objeto vacío
+  genero: Genero = {
+    id: 0,
+    nombre: '',
+  };
+
+  isEditing: boolean = false;
+
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+
+    if (id) {
+      // MODO EDICIÓN
+      this.isEditing = true;
+      this.cargarGenero(Number(id));
+    } else {
+      // MODO CREACIÓN
+      this.isEditing = false;
+    }
+  }
+
+  cargarGenero(id: number): void {
+    this.generoService.getById(id).subscribe({
+      next: (data) => {
+        this.genero = data;
+      },
+      error: (err) => console.error('Error al cargar género', err),
+    });
+  }
+
+  onSubmit(): void {
+    // 1. Validación simple
+    if (!this.genero.nombre.trim()) {
+      alert('El nombre del género es obligatorio');
+      return;
+    }
+
+    if (this.isEditing) {
+      // --- ACTUALIZAR (PUT) ---
+      this.generoService.update(this.genero.id, this.genero).subscribe({
+        next: () => {
+          alert('Género actualizado correctamente');
+          this.router.navigate(['/generos']);
+        },
+        error: (err) => {
+          console.error('Error al actualizar:', err);
+          alert('Error al actualizar el género.');
+        },
+      });
+    } else {
+      //Crea
+      const generoParaGuardar = {
+        nombre: this.genero.nombre,
+      };
+
+      this.generoService.create(generoParaGuardar as any).subscribe({
+        next: () => {
+          alert('Género creado correctamente');
+          this.router.navigate(['/generos']);
+        },
+        error: (err) => {
+          console.error('Error al crear:', err);
+          alert('Error al crear el género.');
+        },
+      });
+    }
+  }
+}
+```
+
+## Related Components
+
+- [GeneroListComponent](/api/components/genero-list) - View all genres
+- [LibroFormComponent](/api/components/libro-form) - Associates genres with books
+
+## Related Services
+
+- [GeneroService](/api/services/genero) - Genre CRUD operations
+
+## Related Models
+
+- [Genero](/api/models/genero) - Genre data structure

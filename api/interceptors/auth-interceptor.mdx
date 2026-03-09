@@ -1,0 +1,248 @@
+---
+title: 'authInterceptor'
+description: 'HTTP interceptor for automatic JWT token injection in all outgoing requests'
+---
+
+## Overview
+
+The `authInterceptor` is an Angular HTTP interceptor that automatically adds JWT authentication tokens to outgoing HTTP requests. It retrieves the token from local storage via the `TokenStorageService` and injects it into the `Authorization` header of each request.
+
+<Note>
+This interceptor uses Angular's functional interceptor API (`HttpInterceptorFn`) introduced in Angular 15+, which is simpler and more tree-shakeable than the class-based approach.
+</Note>
+
+## Signature
+
+```typescript
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // Implementation
+}
+```
+
+### Type Definition
+
+```typescript
+type HttpInterceptorFn = (
+  req: HttpRequest<unknown>,
+  next: HttpHandlerFn
+) => Observable<HttpEvent<unknown>>
+```
+
+**Parameters:**
+- `req` - The outgoing HTTP request to be intercepted
+- `next` - The next handler in the interceptor chain
+
+**Returns:** An `Observable` of the HTTP event stream
+
+## Implementation
+
+```typescript
+import { inject } from '@angular/core';
+import { HttpInterceptorFn } from '@angular/common/http';
+import { TokenStorageService } from '../services/token-storage.service';
+
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const tokenStorage = inject(TokenStorageService);
+  const token = tokenStorage.getToken();
+
+  if (!token) {
+    return next(req);
+  }
+
+  // Añade el token a la petición
+  const clonedRequest = req.clone({
+    setHeaders: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return next(clonedRequest);
+};
+```
+
+## How It Works
+
+1. **Inject TokenStorageService**: Uses Angular's `inject()` function to get the token storage service instance
+2. **Retrieve Token**: Calls `getToken()` to fetch the JWT token from local storage
+3. **Check Token Existence**: If no token exists, passes the original request unchanged to the next handler
+4. **Clone Request**: Creates a cloned request with the `Authorization` header added
+5. **Forward Request**: Passes the modified request to the next handler in the chain
+
+<Info>
+The interceptor clones the request rather than modifying it directly because HTTP requests are immutable in Angular. This ensures the original request object remains unchanged.
+</Info>
+
+## Dependencies
+
+### TokenStorageService
+
+The interceptor depends on the [`TokenStorageService`](/api/services/token-storage) to retrieve the authentication token:
+
+```typescript
+class TokenStorageService {
+  getToken(): string | null;
+  saveToken(token: string): void;
+  signOut(): void;
+  isLoggedIn(): boolean;
+}
+```
+
+The `getToken()` method returns the JWT token stored in `localStorage` under the key `'auth-token'`, or `null` if no token exists.
+
+## Registration
+
+The interceptor must be registered in your application configuration using the `provideHttpClient()` function with the `withInterceptors()` feature.
+
+### app.config.ts
+
+```typescript
+import {
+  ApplicationConfig,
+  provideZoneChangeDetection,
+} from '@angular/core';
+import { provideRouter } from '@angular/router';
+import {
+  provideHttpClient,
+  withFetch,
+  withInterceptors,
+} from '@angular/common/http';
+
+import { authInterceptor } from './core/interceptors/auth-interceptor';
+import { routes } from './app.routes';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(routes),
+    
+    // Register HttpClient with interceptors
+    provideHttpClient(
+      withFetch(),
+      withInterceptors([authInterceptor])
+    ),
+  ],
+};
+```
+
+<Note>
+The `withInterceptors()` function accepts an array of interceptors that will be applied in the order they are provided. The `authInterceptor` is applied to all HTTP requests made through Angular's `HttpClient`.
+</Note>
+
+## Usage Examples
+
+### Basic Usage
+
+Once registered, the interceptor automatically applies to all HTTP requests:
+
+```typescript
+import { HttpClient } from '@angular/common/http';
+import { inject } from '@angular/core';
+
+export class BookService {
+  private http = inject(HttpClient);
+  private apiUrl = 'https://api.example.com';
+
+  getBooks() {
+    // The Authorization header is automatically added
+    return this.http.get(`${this.apiUrl}/books`);
+  }
+
+  createBook(book: Book) {
+    // Works with POST, PUT, DELETE, etc.
+    return this.http.post(`${this.apiUrl}/books`, book);
+  }
+}
+```
+
+### Request Transformation
+
+**Before Interceptor:**
+```http
+GET /api/books HTTP/1.1
+Host: api.example.com
+```
+
+**After Interceptor:**
+```http
+GET /api/books HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Authentication Flow
+
+```typescript
+import { inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { TokenStorageService } from './core/services/token-storage.service';
+
+export class AuthService {
+  private http = inject(HttpClient);
+  private tokenStorage = inject(TokenStorageService);
+
+  login(username: string, password: string) {
+    return this.http.post('/api/auth/login', { username, password })
+      .pipe(
+        tap(response => {
+          // Save token - subsequent requests will include it
+          this.tokenStorage.saveToken(response.token);
+        })
+      );
+  }
+
+  logout() {
+    // Remove token - subsequent requests won't include Authorization header
+    this.tokenStorage.signOut();
+  }
+}
+```
+
+<Info>
+After calling `tokenStorage.saveToken()`, all subsequent HTTP requests will automatically include the `Authorization` header. After calling `tokenStorage.signOut()`, the header will no longer be added.
+</Info>
+
+## Skipping the Interceptor
+
+If you need to make requests without the authentication token (e.g., public endpoints), you can check the token before the request or use a different HTTP client instance. However, the current implementation safely handles missing tokens by passing the request unchanged.
+
+```typescript
+// Public endpoints work fine - no token means no header is added
+this.http.get('/api/public/books').subscribe(books => {
+  console.log(books);
+});
+```
+
+## Testing
+
+The interceptor can be tested using Angular's `TestBed`:
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpInterceptorFn } from '@angular/common/http';
+import { authInterceptor } from './auth-interceptor';
+
+describe('authInterceptor', () => {
+  const interceptor: HttpInterceptorFn = (req, next) => 
+    TestBed.runInInjectionContext(() => authInterceptor(req, next));
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+  });
+
+  it('should be created', () => {
+    expect(interceptor).toBeTruthy();
+  });
+});
+```
+
+## Related Documentation
+
+- [TokenStorageService](/api/services/token-storage) - Service for managing JWT tokens
+- [HttpClient](/api/services/http) - Angular's HTTP client service
+- [AuthService](/api/services/auth) - Authentication service
+
+## Source Code
+
+**Location:** `src/app/core/interceptors/auth-interceptor.ts`
+
+View the complete implementation in the source repository.

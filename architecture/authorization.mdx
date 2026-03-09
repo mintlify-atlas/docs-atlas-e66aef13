@@ -1,0 +1,532 @@
+---
+title: 'Authorization & Guards'
+description: 'Role-based access control with authGuard, adminGuard, and publicGuard'
+---
+
+## Overview
+
+Biblioteca Virtual implements role-based access control (RBAC) using Angular's functional route guards. Three guards work together to control access to different parts of the application based on authentication status and user roles.
+
+## Guard Types
+
+<CardGroup cols={3}>
+  <Card title="authGuard" icon="key">
+    Ensures user is authenticated
+  </Card>
+  <Card title="adminGuard" icon="user-shield">
+    Verifies user has admin role
+  </Card>
+  <Card title="publicGuard" icon="globe">
+    Restricts access to unauthenticated users
+  </Card>
+</CardGroup>
+
+## authGuard - Authentication Check
+
+The `authGuard` verifies that a user has a valid JWT token before accessing protected routes.
+
+```typescript src/app/core/guards/auth-guard.ts
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { TokenStorageService } from '../services/token-storage.service';
+
+export const authGuard: CanActivateFn = (route, state) => {
+  // Inject services
+  const tokenStorage = inject(TokenStorageService);
+  const router = inject(Router);
+
+  // Get token
+  const token = tokenStorage.getToken();
+
+  // Verify token
+  if (token) {
+    // Has token → Allow access
+    return true;
+  } else {
+    // No token → Redirect to login
+    router.navigate(['/auth/login']);
+    return false;
+  }
+};
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Token Retrieval">
+    Gets JWT token from `TokenStorageService`
+  </Step>
+  
+  <Step title="Token Validation">
+    Checks if token exists (non-null)
+  </Step>
+  
+  <Step title="Decision">
+    - **Token exists**: Returns `true`, allows navigation
+    - **No token**: Redirects to `/auth/login`, returns `false`
+  </Step>
+</Steps>
+
+### Usage Example
+
+```typescript app.routes.ts
+{
+  path: 'catalogo',
+  component: CatalogoComponent,
+  canActivate: [authGuard]  // User must be logged in
+}
+```
+
+<Info>
+  `authGuard` does NOT check user roles. It only verifies authentication. Use `adminGuard` for role-based restrictions.
+</Info>
+
+## adminGuard - Role Verification
+
+The `adminGuard` checks if the authenticated user has the `ROLE_ADMIN` role.
+
+```typescript src/app/core/guards/admin-guard.ts
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+
+export const adminGuard: CanActivateFn = (route, state) => {
+  const router = inject(Router);
+
+  // Get role directly from localStorage
+  const role = localStorage.getItem('role');
+
+  if (role === 'ROLE_ADMIN') {
+    // Is Admin: Allow access
+    return true;
+  } else {
+    // Not Admin: Redirect to catalog
+    router.navigate(['/catalogo']);
+    return false;
+  }
+};
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Role Retrieval">
+    Reads user role from localStorage
+  </Step>
+  
+  <Step title="Role Comparison">
+    Checks if role equals `'ROLE_ADMIN'`
+  </Step>
+  
+  <Step title="Decision">
+    - **Is Admin**: Returns `true`, allows navigation
+    - **Not Admin**: Redirects to `/catalogo`, returns `false`
+  </Step>
+</Steps>
+
+### Usage Example
+
+```typescript app.routes.ts
+{
+  path: 'libros',
+  component: LibroListComponent,
+  canActivate: [authGuard, adminGuard]  // Must be authenticated AND admin
+}
+```
+
+<Warning>
+  Always use `adminGuard` together with `authGuard`. Place `authGuard` first to ensure the user is authenticated before checking their role.
+</Warning>
+
+## publicGuard - Unauthenticated Access
+
+The `publicGuard` restricts access to routes that should only be available to unauthenticated users (like login and registration pages).
+
+```typescript src/app/core/guards/public-guard.ts
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { TokenStorageService } from '../services/token-storage.service';
+
+export const publicGuard: CanActivateFn = (route, state) => {
+  const tokenStorage = inject(TokenStorageService);
+  const router = inject(Router);
+
+  // Get token
+  const token = tokenStorage.getToken();
+
+  // If user is logged in
+  if (token) {
+    // Get role from localStorage
+    const role = localStorage.getItem('role');
+
+    // Redirect based on role
+    if (role === 'ROLE_ADMIN') {
+      router.navigate(['/libros']);
+    } else {
+      router.navigate(['/catalogo']);
+    }
+
+    return false; // Block access to login/register
+  }
+
+  // Allow access to login/register
+  return true;
+};
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Token Check">
+    Checks if user has a JWT token
+  </Step>
+  
+  <Step title="Role-Based Redirect">
+    If logged in, redirects based on role:
+    - **Admin**: `/libros` (Book management)
+    - **User**: `/catalogo` (Book catalog)
+  </Step>
+  
+  <Step title="Access Control">
+    - **Logged in**: Returns `false`, blocks access to public routes
+    - **Not logged in**: Returns `true`, allows access
+  </Step>
+</Steps>
+
+### Usage Example
+
+```typescript app.routes.ts
+{
+  path: 'auth/login',
+  component: LoginComponent,
+  canActivate: [publicGuard]  // Only accessible when NOT logged in
+}
+```
+
+<Note>
+  This prevents logged-in users from accessing the login page, improving UX by automatically redirecting them to their appropriate dashboard.
+</Note>
+
+## Guard Combination Patterns
+
+### Public Routes
+
+Routes accessible only to unauthenticated users:
+
+```typescript
+// Login and Registration
+{ path: 'auth/login', component: LoginComponent, canActivate: [publicGuard] }
+{ path: 'auth/registro', component: RegistroComponent, canActivate: [publicGuard] }
+```
+
+### Authenticated User Routes
+
+Routes accessible to any logged-in user (admin or regular user):
+
+```typescript
+// User catalog
+{ path: 'catalogo', component: CatalogoComponent, canActivate: [authGuard] }
+```
+
+### Admin-Only Routes
+
+Routes accessible only to authenticated admins:
+
+```typescript
+// Book management
+{ 
+  path: 'libros', 
+  component: LibroListComponent, 
+  canActivate: [authGuard, adminGuard]  // Both guards required
+}
+```
+
+## Guard Execution Flow
+
+When multiple guards are specified, they execute sequentially:
+
+<Tabs>
+  <Tab title="Success Path">
+    ```mermaid
+    graph TD
+      A[User navigates to /libros] --> B{authGuard}
+      B -->|Token exists| C{adminGuard}
+      C -->|role === ROLE_ADMIN| D[Access Granted]
+      D --> E[Load LibroListComponent]
+    ```
+  </Tab>
+  
+  <Tab title="Auth Failure">
+    ```mermaid
+    graph TD
+      A[User navigates to /libros] --> B{authGuard}
+      B -->|No token| C[Redirect to /auth/login]
+      C --> D[Access Denied]
+    ```
+  </Tab>
+  
+  <Tab title="Role Failure">
+    ```mermaid
+    graph TD
+      A[User navigates to /libros] --> B{authGuard}
+      B -->|Token exists| C{adminGuard}
+      C -->|role !== ROLE_ADMIN| D[Redirect to /catalogo]
+      D --> E[Access Denied]
+    ```
+  </Tab>
+</Tabs>
+
+## Role-Based Navigation in Components
+
+Show/hide UI elements based on user role:
+
+```typescript Conditional Navigation
+import { Component, OnInit } from '@angular/core';
+import { AuthService } from './auth/auth.service';
+
+export class NavbarComponent implements OnInit {
+  isAdmin = false;
+  isLoggedIn = false;
+
+  constructor(private authService: AuthService) {}
+
+  ngOnInit() {
+    this.isAdmin = this.authService.isAdmin();
+    this.isLoggedIn = this.tokenStorage.isLoggedIn();
+  }
+}
+```
+
+```html Template with Role Checks
+<!-- Show only to admins -->
+<nav *ngIf="isAdmin">
+  <a routerLink="/libros">Libros</a>
+  <a routerLink="/autores">Autores</a>
+  <a routerLink="/generos">Géneros</a>
+  <a routerLink="/prestamos">Préstamos</a>
+</nav>
+
+<!-- Show to all logged-in users -->
+<nav *ngIf="isLoggedIn">
+  <a routerLink="/catalogo">Catálogo</a>
+</nav>
+
+<!-- Show only to logged-out users -->
+<nav *ngIf="!isLoggedIn">
+  <a routerLink="/auth/login">Iniciar Sesión</a>
+  <a routerLink="/auth/registro">Registrarse</a>
+</nav>
+```
+
+## User Roles
+
+The application supports two user roles:
+
+<Tabs>
+  <Tab title="ROLE_ADMIN">
+    **Permissions:**
+    - Access all authenticated routes
+    - Manage books (CRUD operations)
+    - Manage authors (CRUD operations)
+    - Manage genres (CRUD operations)
+    - View and manage loans
+    - Access user catalog
+    
+    **Default Redirect:** `/libros`
+  </Tab>
+  
+  <Tab title="ROLE_USER">
+    **Permissions:**
+    - Access catalog to browse books
+    - View book details
+    - Cannot access admin management pages
+    
+    **Default Redirect:** `/catalogo`
+  </Tab>
+</Tabs>
+
+## Programmatic Role Checks
+
+Use `AuthService` methods to check roles in component logic:
+
+```typescript Component Logic
+export class SomeComponent {
+  private authService = inject(AuthService);
+
+  canEdit() {
+    return this.authService.isAdmin();
+  }
+
+  showAdminFeatures() {
+    if (this.authService.isAdmin()) {
+      // Show admin UI
+    } else if (this.authService.isUser()) {
+      // Show user UI
+    }
+  }
+}
+```
+
+## Guard Testing
+
+Example unit tests for guards:
+
+```typescript auth-guard.spec.ts
+describe('authGuard', () => {
+  it('should allow access when token exists', () => {
+    spyOn(tokenStorage, 'getToken').and.returnValue('mock-token');
+    
+    const result = authGuard(null, null);
+    
+    expect(result).toBe(true);
+  });
+
+  it('should redirect to login when no token', () => {
+    spyOn(tokenStorage, 'getToken').and.returnValue(null);
+    spyOn(router, 'navigate');
+    
+    const result = authGuard(null, null);
+    
+    expect(result).toBe(false);
+    expect(router.navigate).toHaveBeenCalledWith(['/auth/login']);
+  });
+});
+```
+
+```typescript admin-guard.spec.ts
+describe('adminGuard', () => {
+  it('should allow access for admin role', () => {
+    spyOn(localStorage, 'getItem').and.returnValue('ROLE_ADMIN');
+    
+    const result = adminGuard(null, null);
+    
+    expect(result).toBe(true);
+  });
+
+  it('should redirect to catalog for non-admin', () => {
+    spyOn(localStorage, 'getItem').and.returnValue('ROLE_USER');
+    spyOn(router, 'navigate');
+    
+    const result = adminGuard(null, null);
+    
+    expect(result).toBe(false);
+    expect(router.navigate).toHaveBeenCalledWith(['/catalogo']);
+  });
+});
+```
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Server-Side Validation" icon="server">
+    Always validate permissions on the backend. Guards only control UI access, not API security.
+  </Card>
+  
+  <Card title="Guard Order" icon="list-check">
+    Place `authGuard` before `adminGuard` to avoid checking roles for unauthenticated users.
+  </Card>
+  
+  <Card title="Token Validation" icon="shield-check">
+    Implement token expiration handling and refresh mechanisms.
+  </Card>
+  
+  <Card title="Hide UI Elements" icon="eye-slash">
+    Use role checks to hide admin features from regular users in the UI.
+  </Card>
+</CardGroup>
+
+## Common Scenarios
+
+### Scenario 1: Unauthenticated User
+
+```typescript
+User visits: /libros
+↓
+authGuard checks token → No token
+↓
+Redirect to: /auth/login
+```
+
+### Scenario 2: Regular User Accessing Admin Route
+
+```typescript
+User visits: /libros
+↓
+authGuard checks token → Token exists ✓
+↓
+adminGuard checks role → ROLE_USER ✗
+↓
+Redirect to: /catalogo
+```
+
+### Scenario 3: Admin User
+
+```typescript
+Admin visits: /libros
+↓
+authGuard checks token → Token exists ✓
+↓
+adminGuard checks role → ROLE_ADMIN ✓
+↓
+Access granted: Load LibroListComponent
+```
+
+### Scenario 4: Logged-In User Visits Login
+
+```typescript
+User visits: /auth/login
+↓
+publicGuard checks token → Token exists
+↓
+publicGuard checks role → ROLE_USER
+↓
+Redirect to: /catalogo
+```
+
+## Advanced: Custom Guards
+
+Create custom guards for specific business logic:
+
+```typescript Custom Permission Guard
+export const permissionGuard = (requiredPermission: string): CanActivateFn => {
+  return (route, state) => {
+    const authService = inject(AuthService);
+    const router = inject(Router);
+    
+    const userPermissions = getUserPermissions(); // Custom logic
+    
+    if (userPermissions.includes(requiredPermission)) {
+      return true;
+    }
+    
+    router.navigate(['/unauthorized']);
+    return false;
+  };
+};
+
+// Usage
+{
+  path: 'prestamos/create',
+  component: PrestamoFormComponent,
+  canActivate: [authGuard, permissionGuard('CREATE_LOANS')]
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing" href="/architecture/routing" icon="route">
+    Review complete route configuration
+  </Card>
+  
+  <Card title="Authentication" href="/architecture/authentication" icon="key">
+    Learn about JWT authentication flow
+  </Card>
+  
+  <Card title="User Management" href="/features/admin-panel" icon="users">
+    Manage user accounts and roles
+  </Card>
+  
+  <Card title="Error Handling" href="/features/admin-panel" icon="triangle-exclamation">
+    Handle authorization errors gracefully
+  </Card>
+</CardGroup>

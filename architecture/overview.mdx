@@ -1,0 +1,295 @@
+---
+title: 'Application Architecture'
+description: 'Understanding the structure and design patterns of Biblioteca Virtual Frontend'
+---
+
+## Overview
+
+Biblioteca Virtual Frontend is built with **Angular 19** using modern standalone components architecture. The application follows a feature-based folder structure with clear separation of concerns between authentication, core services, and feature modules.
+
+## Technology Stack
+
+<CardGroup cols={2}>
+  <Card title="Angular 19" icon="angular">
+    Standalone components with functional guards and interceptors
+  </Card>
+  <Card title="TypeScript" icon="code">
+    Strongly-typed application logic and interfaces
+  </Card>
+  <Card title="JWT Authentication" icon="key">
+    Token-based authentication with HTTP interceptors
+  </Card>
+  <Card title="Role-Based Access" icon="shield">
+    Admin and User role management with route guards
+  </Card>
+</CardGroup>
+
+## Folder Structure
+
+The application follows a clear, feature-based architecture that promotes maintainability and scalability:
+
+```
+src/app/
+├── auth/                          # Authentication feature module
+│   ├── login/                     # Login component
+│   ├── registro/                  # Registration component
+│   └── auth.service.ts            # Authentication service
+│
+├── core/                          # Core application services
+│   ├── guards/                    # Route protection guards
+│   │   ├── auth-guard.ts         # Authentication guard
+│   │   ├── admin-guard.ts        # Admin authorization guard
+│   │   └── public-guard.ts       # Public routes guard
+│   │
+│   ├── interceptors/             # HTTP interceptors
+│   │   └── auth-interceptor.ts   # JWT token interceptor
+│   │
+│   ├── models/                   # TypeScript interfaces
+│   │   ├── auth.interface.ts     # Auth request/response types
+│   │   ├── libro.ts              # Book model
+│   │   ├── autor.ts              # Author model
+│   │   ├── genero.ts             # Genre model
+│   │   └── prestamo.ts           # Loan model
+│   │
+│   └── services/                 # Core services
+│       └── token-storage.service.ts  # Token management
+│
+├── features/                     # Feature modules
+│   ├── catalogo/                # Book catalog (user view)
+│   ├── libros/                  # Book management (admin)
+│   │   ├── libro-list/
+│   │   └── libro-form/
+│   ├── autores/                 # Author management (admin)
+│   │   ├── autor-list/
+│   │   └── autor-form/
+│   ├── generos/                 # Genre management (admin)
+│   │   ├── genero-list/
+│   │   └── genero-form/
+│   └── prestamos/               # Loan management (admin)
+│       └── prestamo-list/
+│
+├── shared/                      # Shared components
+│   └── components/
+│       └── navbar/              # Navigation bar
+│
+├── app.ts                       # Root component
+├── app.config.ts                # Application configuration
+└── app.routes.ts                # Routing configuration
+```
+
+## Standalone Components Architecture
+
+The application leverages Angular's modern standalone components pattern, eliminating the need for NgModules:
+
+```typescript src/app/app.ts
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { NavbarComponent } from './shared/components/navbar/navbar';
+
+@Component({
+  selector: 'app-root',
+  imports: [RouterOutlet, NavbarComponent],
+  templateUrl: './app.html',
+  styleUrl: './app.css',
+})
+export class App {
+  protected title = 'biblioteca-front';
+}
+```
+
+<Note>
+  All components in this application are standalone, directly importing their dependencies without NgModules. This simplifies the architecture and improves tree-shaking.
+</Note>
+
+## Application Configuration
+
+The application is bootstrapped using functional configuration providers:
+
+```typescript src/app/app.config.ts
+import {
+  ApplicationConfig,
+  provideBrowserGlobalErrorListeners,
+  provideZoneChangeDetection,
+} from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { routes } from './app.routes';
+import {
+  provideHttpClient,
+  withFetch,
+  withInterceptors,
+} from '@angular/common/http';
+import { authInterceptor } from './core/interceptors/auth-interceptor';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(routes),
+    
+    // HTTP Client with JWT interceptor
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+  ],
+};
+```
+
+### Key Configuration Features
+
+<Steps>
+  <Step title="Router Configuration">
+    Routes are provided using `provideRouter(routes)` with all route definitions from `app.routes.ts`
+  </Step>
+  
+  <Step title="HTTP Client Setup">
+    `provideHttpClient` is configured with:
+    - `withFetch()` - Uses the modern Fetch API
+    - `withInterceptors([authInterceptor])` - Automatically adds JWT tokens to requests
+  </Step>
+  
+  <Step title="Zone Change Detection">
+    Optimized with event coalescing for better performance
+  </Step>
+  
+  <Step title="Global Error Listeners">
+    Centralized error handling across the application
+  </Step>
+</Steps>
+
+## Design Patterns
+
+### 1. Service-Based Architecture
+
+All business logic is encapsulated in injectable services:
+
+- **AuthService** - Handles login, registration, and session management
+- **TokenStorageService** - Manages JWT token storage in localStorage
+- Domain services for Books, Authors, Genres, and Loans
+
+### 2. Functional Guards
+
+Modern functional route guards replace class-based guards:
+
+```typescript
+export const authGuard: CanActivateFn = (route, state) => {
+  const tokenStorage = inject(TokenStorageService);
+  const router = inject(Router);
+  
+  const token = tokenStorage.getToken();
+  
+  if (token) {
+    return true;
+  } else {
+    router.navigate(['/auth/login']);
+    return false;
+  }
+};
+```
+
+### 3. HTTP Interceptors
+
+Functional interceptors automatically attach JWT tokens to outgoing requests:
+
+```typescript src/app/core/interceptors/auth-interceptor.ts
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const tokenStorage = inject(TokenStorageService);
+  const token = tokenStorage.getToken();
+
+  if (!token) {
+    return next(req);
+  }
+
+  const clonedRequest = req.clone({
+    setHeaders: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return next(clonedRequest);
+};
+```
+
+### 4. TypeScript Interfaces
+
+Strong typing ensures type safety across the application:
+
+```typescript src/app/core/models/auth.interface.ts
+export interface AuthRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  tipoToken: string;
+  username: string;
+  role: string;
+}
+```
+
+## Feature Modules Organization
+
+Each feature follows a consistent structure:
+
+<Tabs>
+  <Tab title="List Components">
+    Display data in tables with CRUD operations
+    - libro-list
+    - autor-list
+    - genero-list
+    - prestamo-list
+  </Tab>
+  
+  <Tab title="Form Components">
+    Handle create and edit operations
+    - libro-form
+    - autor-form
+    - genero-form
+  </Tab>
+  
+  <Tab title="Services">
+    Communicate with backend APIs
+    - autor.service.ts
+    - libro.service.ts
+    - genero.service.ts
+    - prestamo.service.ts
+  </Tab>
+</Tabs>
+
+## Core Principles
+
+<CardGroup cols={2}>
+  <Card title="Separation of Concerns" icon="layer-group">
+    Authentication, core services, and features are clearly separated
+  </Card>
+  
+  <Card title="Single Responsibility" icon="cube">
+    Each service, guard, and component has a focused purpose
+  </Card>
+  
+  <Card title="Dependency Injection" icon="plug">
+    All services use Angular's DI system for loose coupling
+  </Card>
+  
+  <Card title="Type Safety" icon="shield-check">
+    TypeScript interfaces ensure compile-time type checking
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing" href="/architecture/routing" icon="route">
+    Learn about route configuration and navigation
+  </Card>
+  
+  <Card title="Authentication" href="/architecture/authentication" icon="key">
+    Understand the JWT authentication flow
+  </Card>
+  
+  <Card title="Authorization" href="/architecture/authorization" icon="lock">
+    Explore role-based access control with guards
+  </Card>
+  
+  <Card title="Services" href="/api/services/auth-service" icon="plug">
+    See how to integrate with backend services
+  </Card>
+</CardGroup>

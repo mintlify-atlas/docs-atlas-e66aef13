@@ -1,0 +1,164 @@
+---
+title: AutorListComponent
+description: Component for displaying and managing the list of authors
+---
+
+## Overview
+
+The `AutorListComponent` provides administrators with a view of all authors in the system. It allows creating new authors, editing existing ones, and deleting authors that are not associated with any books.
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-autor-list',
+  standalone: true,
+  imports: [CommonModule, RouterLink],
+  templateUrl: './autor-list.html',
+  styleUrls: ['./autor-list.css'],
+})
+```
+
+**Selector:** `app-autor-list`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+- `RouterLink` - Router navigation for creating and editing
+
+**Template:** `./autor-list.html`
+
+## Properties
+
+### autores
+
+```typescript
+autores: Autor[] = []
+```
+
+Array containing all authors in the system. Each author object includes:
+- `id`: Author identifier
+- `nombre`: Author name
+- `urlFoto`: Optional photo URL
+
+## Injected Services
+
+```typescript
+private autorService = inject(AutorService)
+```
+
+- **AutorService** - Handles all author-related API operations
+
+## Lifecycle Hooks
+
+### ngOnInit
+
+```typescript
+ngOnInit(): void {
+  this.cargarAutores();
+}
+```
+
+Called when the component initializes. Immediately loads all authors from the backend.
+
+## Methods
+
+### cargarAutores
+
+```typescript
+cargarAutores(): void
+```
+
+Fetches all authors from the `AutorService` and populates the `autores` array:
+- On success: Updates `autores` array and logs the data to console
+- On error: Logs error message to console with prefix "Error al cargar autores:"
+
+This method is called on initialization and after deleting an author to refresh the list.
+
+### eliminarAutor
+
+```typescript
+eliminarAutor(id: number): void
+```
+
+Deletes an author from the system:
+
+1. Displays confirmation dialog "¿Estás seguro de eliminar este autor?"
+2. If confirmed, calls `AutorService.delete()` with the author ID
+3. On success:
+   - Reloads the author list by calling `cargarAutores()`
+4. On error:
+   - Logs error to console
+   - Shows error alert "No se pudo eliminar el autor (quizás tiene libros asociados)."
+
+The error handling specifically mentions associated books because the backend prevents deleting authors that are referenced by existing books.
+
+**Parameters:**
+- `id` - The numeric ID of the author to delete
+
+## Full Source Code
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { AutorService } from '../../../core/services/autor';
+import { Autor } from '../../../core/models/autor';
+
+@Component({
+  selector: 'app-autor-list',
+  standalone: true,
+  imports: [CommonModule, RouterLink],
+  templateUrl: './autor-list.html',
+  styleUrls: ['./autor-list.css'],
+})
+export class AutorListComponent implements OnInit {
+  private autorService = inject(AutorService);
+
+  autores: Autor[] = [];
+
+  ngOnInit(): void {
+    this.cargarAutores();
+  }
+
+  cargarAutores(): void {
+    this.autorService.getAll().subscribe({
+      next: (data) => {
+        this.autores = data;
+        console.log('Autores cargados:', data);
+      },
+      error: (err) => {
+        console.error('Error al cargar autores:', err);
+      },
+    });
+  }
+
+  eliminarAutor(id: number): void {
+    if (confirm('¿Estás seguro de eliminar este autor?')) {
+      this.autorService.delete(id).subscribe({
+        next: () => {
+          this.cargarAutores();
+        },
+        error: (err) => {
+          console.error('Error al eliminar:', err);
+          alert(
+            'No se pudo eliminar el autor (quizás tiene libros asociados).'
+          );
+        },
+      });
+    }
+  }
+}
+```
+
+## Related Components
+
+- [AutorFormComponent](/api/components/autor-form) - Create and edit authors
+- [LibroFormComponent](/api/components/libro-form) - Associates authors with books
+
+## Related Services
+
+- [AutorService](/api/services/autor) - Author CRUD operations
+
+## Related Models
+
+- [Autor](/api/models/autor) - Author data structure

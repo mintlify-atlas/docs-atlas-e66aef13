@@ -1,0 +1,198 @@
+---
+title: RegistroComponent
+description: Component for user registration and account creation
+---
+
+## Overview
+
+The `RegistroComponent` allows new users to create an account in the system. After successful registration, users are automatically redirected to the login page.
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-registro',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  templateUrl: './registro.html',
+  styleUrls: ['./registro.css'],
+})
+```
+
+**Selector:** `app-registro`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+- `ReactiveFormsModule` - Reactive forms support
+- `RouterLink` - Router navigation
+
+**Template:** `./registro.html`
+
+## Properties
+
+### registroForm
+
+```typescript
+registroForm: FormGroup
+```
+
+Reactive form group containing username and password fields with validators:
+- `username`: Required, minimum 4 characters
+- `password`: Required, minimum 4 characters
+
+### mensajeError
+
+```typescript
+mensajeError: string = ''
+```
+
+Stores validation or registration error messages to display to the user.
+
+### isSuccess
+
+```typescript
+isSuccess: boolean = false
+```
+
+Indicates whether registration was successful. When `true`, displays success message and hides the form.
+
+## Constructor Dependencies
+
+```typescript
+constructor(
+  private fb: FormBuilder,
+  private authService: AuthService,
+  private router: Router
+)
+```
+
+- **FormBuilder** - Creates reactive form controls
+- **AuthService** - Handles registration API calls
+- **Router** - Navigates to login after successful registration
+
+## Methods
+
+### onSubmit
+
+```typescript
+onSubmit(): void
+```
+
+Handles form submission and user registration:
+
+1. Validates the form is complete and meets requirements
+2. Extracts username and password from the form
+3. Calls `AuthService.register()` with the registration data
+4. On success:
+   - Sets `isSuccess` to `true`
+   - Clears any error messages
+   - Waits 3 seconds, then redirects to `/auth/login`
+5. On error: Displays message "Error al registrar. Es posible que el usuario ya exista."
+
+**Example usage in template:**
+
+```html
+<form [formGroup]="registroForm" (ngSubmit)="onSubmit()" *ngIf="!isSuccess">
+  <div class="mb-3">
+    <label for="username" class="form-label">Nombre de Usuario</label>
+    <input
+      type="text"
+      id="username"
+      class="form-control"
+      formControlName="username"
+      placeholder="Elige un usuario"
+    />
+  </div>
+  
+  <div class="mb-3">
+    <label for="password" class="form-label">Contraseña</label>
+    <input
+      type="password"
+      id="password"
+      class="form-control"
+      formControlName="password"
+      placeholder="Crea una contraseña"
+    />
+  </div>
+  
+  <button type="submit" class="btn btn-success" [disabled]="registroForm.invalid">
+    Registrarse
+  </button>
+</form>
+```
+
+## Full Source Code
+
+```typescript
+import { Component } from '@angular/core';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { CommonModule } from '@angular/common';
+
+import { AuthService } from '../auth.service';
+
+@Component({
+  selector: 'app-registro',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  templateUrl: './registro.html',
+  styleUrls: ['./registro.css'],
+})
+export class RegistroComponent {
+  registroForm: FormGroup;
+  mensajeError: string = '';
+  isSuccess: boolean = false;
+
+  constructor(
+    private fb: FormBuilder,
+    private authService: AuthService,
+    private router: Router
+  ) {
+    this.registroForm = this.fb.group({
+      username: ['', [Validators.required, Validators.minLength(4)]],
+      password: ['', [Validators.required, Validators.minLength(4)]],
+    });
+  }
+
+  onSubmit() {
+    if (this.registroForm.invalid) {
+      this.mensajeError = 'Por favor completa el formulario correctamente.';
+      return;
+    }
+
+    const { username, password } = this.registroForm.value;
+
+    const registroData = { username, password };
+
+    this.authService.register(registroData).subscribe({
+      next: (resp) => {
+        this.isSuccess = true;
+        this.mensajeError = '';
+
+        setTimeout(() => {
+          this.router.navigate(['/auth/login']);
+        }, 3000);
+      },
+      error: (err) => {
+        console.error('Error registro:', err);
+        this.mensajeError =
+          'Error al registrar. Es posible que el usuario ya exista.';
+        this.isSuccess = false;
+      },
+    });
+  }
+}
+```
+
+## Related Components
+
+- [LoginComponent](/api/components/login) - User login after registration
+
+## Related Services
+
+- [AuthService](/api/services/auth) - Registration API calls

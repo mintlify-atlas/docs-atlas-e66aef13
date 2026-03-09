@@ -1,0 +1,218 @@
+---
+title: CatalogoComponent
+description: Component displaying the book catalog for regular users with loan request functionality
+---
+
+## Overview
+
+The `CatalogoComponent` displays the complete catalog of available books to regular users. It allows users to browse books and request loans for available titles.
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-catalogo',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './catalogo.html',
+  styleUrls: ['./catalogo.css'],
+})
+```
+
+**Selector:** `app-catalogo`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+
+**Template:** `./catalogo.html`
+
+## Properties
+
+### libros
+
+```typescript
+libros: Libro[] = []
+```
+
+Array containing all books fetched from the backend. Each book includes:
+- `id`: Book identifier
+- `titulo`: Book title
+- `portada`: Cover image URL
+- `anioPublicacion`: Publication year
+- `disponible`: Availability status
+- `genero`: Genre information
+- `autores`: Array of author information
+
+### loading
+
+```typescript
+loading: boolean = true
+```
+
+Indicates whether the book data is currently being loaded. Used to show loading spinner.
+
+## Injected Services
+
+```typescript
+private libroService = inject(LibroService)
+private prestamoService = inject(PrestamoService)
+```
+
+- **LibroService** - Fetches book data from the API
+- **PrestamoService** - Handles loan requests
+
+## Lifecycle Hooks
+
+### ngOnInit
+
+```typescript
+ngOnInit(): void {
+  this.cargarLibros();
+}
+```
+
+Called on component initialization. Loads all books from the backend.
+
+## Methods
+
+### cargarLibros
+
+```typescript
+cargarLibros(): void
+```
+
+Fetches all books from the `LibroService`:
+- On success: Populates `libros` array and sets `loading` to `false`
+- On error: Logs error to console and sets `loading` to `false`
+
+### solicitarPrestamo
+
+```typescript
+solicitarPrestamo(libro: Libro): void
+```
+
+Initiates a loan request for the specified book:
+
+1. Displays confirmation dialog with book title
+2. If confirmed, calls `PrestamoService.solicitar()` with the book ID
+3. On success: Shows success alert informing user that admin will review the request
+4. On error: Shows error alert with the error message from the backend
+
+**Parameters:**
+- `libro` - The `Libro` object for which to request a loan
+
+## Template Features
+
+The component template displays books in a responsive card grid:
+
+```html
+<div class="row row-cols-1 row-cols-md-3 g-4" *ngIf="!loading">
+  <div class="col" *ngFor="let libro of libros">
+    <div class="card h-100 shadow-sm border-0">
+      <!-- Book cover or default icon -->
+      <div class="text-center bg-light p-3">
+        <img *ngIf="libro.portada" [src]="libro.portada" class="card-img-top" />
+        <div *ngIf="!libro.portada">📘</div>
+      </div>
+      
+      <!-- Book details -->
+      <div class="card-body">
+        <span class="badge bg-info">{{ libro.genero?.nombre }}</span>
+        <span class="badge" [ngClass]="libro.disponible ? 'bg-success' : 'bg-danger'">
+          {{ libro.disponible ? 'Disponible' : 'Agotado' }}
+        </span>
+        
+        <h5>{{ libro.titulo }}</h5>
+        <p>Por: {{ libro.autores }}</p>
+        <p>Año: {{ libro.anioPublicacion }}</p>
+      </div>
+      
+      <!-- Request loan button -->
+      <div class="card-footer">
+        <button 
+          class="btn btn-outline-primary" 
+          [disabled]="!libro.disponible"
+          (click)="solicitarPrestamo(libro)">
+          {{ libro.disponible ? 'Solicitar Préstamo' : 'No Disponible' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+## Full Source Code
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { LibroService } from '../../core/services/libro';
+import { PrestamoService } from '../../core/services/prestamo';
+import { Libro } from '../../core/models/libro';
+
+@Component({
+  selector: 'app-catalogo',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './catalogo.html',
+  styleUrls: ['./catalogo.css'],
+})
+export class CatalogoComponent implements OnInit {
+  private libroService = inject(LibroService);
+  private prestamoService = inject(PrestamoService);
+
+  libros: Libro[] = [];
+  loading: boolean = true;
+
+  ngOnInit(): void {
+    this.cargarLibros();
+  }
+
+  cargarLibros(): void {
+    this.libroService.getAll().subscribe({
+      next: (data) => {
+        this.libros = data;
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error(err);
+        this.loading = false;
+      },
+    });
+  }
+
+  solicitarPrestamo(libro: Libro): void {
+    if (
+      !confirm(`¿Deseas solicitar el préstamo del libro "${libro.titulo}"?`)
+    ) {
+      return;
+    }
+
+    this.prestamoService.solicitar(libro.id).subscribe({
+      next: () => {
+        alert(
+          '✅ Solicitud enviada con éxito. El administrador evaluará tu petición.'
+        );
+      },
+      error: (err) => {
+        console.error(err);
+        alert(err?.error || '❌ Error al solicitar el préstamo');
+      },
+    });
+  }
+}
+```
+
+## Related Components
+
+- [PrestamoListComponent](/api/components/prestamo-list) - Admin view for managing loan requests
+- [LibroListComponent](/api/components/libro-list) - Admin view for managing books
+
+## Related Services
+
+- [LibroService](/api/services/libro) - Book data operations
+- [PrestamoService](/api/services/prestamo) - Loan request operations
+
+## Related Models
+
+- [Libro](/api/models/libro) - Book data structure

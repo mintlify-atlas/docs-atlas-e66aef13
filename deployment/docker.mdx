@@ -1,0 +1,187 @@
+---
+title: 'Docker Deployment'
+description: 'Deploy the frontend using Docker with multi-stage builds and Nginx'
+---
+
+## Overview
+
+The Biblioteca Virtual Frontend uses a multi-stage Docker build to create an optimized production image. The build process compiles the Angular application and serves it using Nginx.
+
+## Dockerfile Structure
+
+The Dockerfile consists of two stages:
+
+<Steps>
+  <Step title="Stage 1: Build Angular Application">
+    Uses Node.js 20 Alpine to compile the Angular application with production optimizations.
+  </Step>
+  
+  <Step title="Stage 2: Nginx Web Server">
+    Uses Nginx Alpine to serve the compiled static files with minimal overhead.
+  </Step>
+</Steps>
+
+### Complete Dockerfile
+
+```dockerfile
+# ===== STAGE 1: Build Angular =====
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build -- --configuration production
+
+
+# ===== STAGE 2: Nginx =====
+FROM nginx:alpine
+
+# Elimina config por defecto
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copia nuestra configuración
+COPY nginx.conf /etc/nginx/conf.d
+
+# Copia el build de Angular al servidor web
+COPY --from=build /app/dist/biblioteca-front/browser /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+## Nginx Configuration
+
+The application uses a custom Nginx configuration to support Angular's client-side routing:
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+<Info>
+  The `try_files` directive ensures that all routes are handled by Angular's router, enabling client-side navigation to work correctly.
+</Info>
+
+## Building the Docker Image
+
+### Local Build
+
+Build the Docker image locally:
+
+```bash
+docker build -t biblioteca-virtual-frontend:latest .
+```
+
+### Build with Custom Tag
+
+```bash
+docker build -t your-registry/biblioteca-virtual-frontend:v1.0.0 .
+```
+
+## Running the Container
+
+### Basic Run
+
+Start the container on port 80:
+
+```bash
+docker run -d -p 80:80 biblioteca-virtual-frontend:latest
+```
+
+### Custom Port Mapping
+
+Run on a different port (e.g., 8080):
+
+```bash
+docker run -d -p 8080:80 biblioteca-virtual-frontend:latest
+```
+
+### With Custom Name
+
+```bash
+docker run -d -p 80:80 --name biblioteca-frontend biblioteca-virtual-frontend:latest
+```
+
+## Docker Compose
+
+Example `docker-compose.yml` for the frontend:
+
+```yaml
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - biblioteca-network
+
+networks:
+  biblioteca-network:
+    driver: bridge
+```
+
+## Production Optimization
+
+The multi-stage build provides several benefits:
+
+- **Smaller Image Size**: Only the compiled application and Nginx are included in the final image
+- **Security**: No build tools or source code in production image
+- **Performance**: Nginx serves static files efficiently
+- **Caching**: Dependencies are cached in separate layer for faster rebuilds
+
+<Warning>
+  Ensure you build with the correct environment configuration for production. See the [Environment Configuration](/deployment/environment) page for details.
+</Warning>
+
+## Health Checks
+
+Add a health check to your Docker container:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+```
+
+## Troubleshooting
+
+### Container Fails to Start
+
+Check the logs:
+
+```bash
+docker logs <container-id>
+```
+
+### Port Already in Use
+
+If port 80 is already in use, map to a different port:
+
+```bash
+docker run -d -p 8080:80 biblioteca-virtual-frontend:latest
+```
+
+### Build Fails
+
+Ensure you have enough disk space and memory allocated to Docker:
+
+```bash
+docker system df
+docker system prune
+```

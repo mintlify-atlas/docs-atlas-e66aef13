@@ -1,0 +1,148 @@
+---
+title: authGuard
+description: Authentication guard that protects routes requiring user authentication
+---
+
+## Overview
+
+The `authGuard` is an Angular route guard that ensures only authenticated users can access protected routes. It checks for the presence of a valid authentication token and redirects unauthenticated users to the login page.
+
+## Signature
+
+```typescript
+export const authGuard: CanActivateFn
+```
+
+### Type Definition
+
+```typescript
+type CanActivateFn = (
+  route: ActivatedRouteSnapshot,
+  state: RouterStateSnapshot
+) => boolean | UrlTree | Observable<boolean | UrlTree> | Promise<boolean | UrlTree>
+```
+
+## Implementation
+
+```typescript
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { TokenStorageService } from '../services/token-storage.service';
+
+export const authGuard: CanActivateFn = (route, state) => {
+  // Inyecta los servicios
+  const tokenStorage = inject(TokenStorageService);
+  const router = inject(Router);
+
+  // Obtiene el token
+  const token = tokenStorage.getToken();
+
+  // Verifica
+  if (token) {
+    //Tiene token -> Pasa
+    return true;
+  } else {
+    // No tiene token -> Al Login
+    router.navigate(['/auth/login']);
+    return false;
+  }
+};
+```
+
+## Parameters
+
+<ParamField path="route" type="ActivatedRouteSnapshot">
+  Contains information about the route being activated
+</ParamField>
+
+<ParamField path="state" type="RouterStateSnapshot">
+  Contains the router state at a particular moment in time
+</ParamField>
+
+## Return Value
+
+<ResponseField name="return" type="boolean">
+  - `true` - User is authenticated, allow access to the route
+  - `false` - User is not authenticated, redirect to `/auth/login`
+</ResponseField>
+
+## Usage
+
+### Route Configuration
+
+Apply the `authGuard` to routes that require authentication:
+
+```typescript
+import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth-guard';
+
+export const routes: Routes = [
+  {
+    path: 'catalogo',
+    loadComponent: () => import('./pages/catalogo/catalogo.component'),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'libros',
+    loadComponent: () => import('./pages/libros/libros.component'),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'prestamos',
+    loadComponent: () => import('./pages/prestamos/prestamos.component'),
+    canActivate: [authGuard]
+  }
+];
+```
+
+### Protecting Multiple Routes
+
+You can apply the guard to a parent route to protect all child routes:
+
+```typescript
+{
+  path: 'dashboard',
+  canActivate: [authGuard],
+  children: [
+    { path: 'profile', component: ProfileComponent },
+    { path: 'settings', component: SettingsComponent }
+  ]
+}
+```
+
+## How It Works
+
+1. **Token Check**: The guard retrieves the authentication token from `TokenStorageService`
+2. **Validation**: If a token exists, the user is considered authenticated
+3. **Access Control**:
+   - **Authenticated**: Returns `true`, allowing navigation to proceed
+   - **Not Authenticated**: Redirects to `/auth/login` and returns `false`
+
+## Dependencies
+
+- **TokenStorageService** (`src/app/core/guards/auth-guard.ts:7`): Service for managing authentication tokens
+- **Router** (`src/app/core/guards/auth-guard.ts:8`): Angular router for navigation
+
+<Note>
+This guard uses Angular's modern functional guard approach (introduced in Angular 14+) instead of the older class-based guard pattern.
+</Note>
+
+<Warning>
+The guard only checks for the **presence** of a token, not its validity. If your token can expire, consider implementing token validation or refresh logic in the `TokenStorageService`.
+</Warning>
+
+## When to Use
+
+Use `authGuard` when you need to:
+
+- Protect routes that require any authenticated user (regardless of role)
+- Prevent anonymous users from accessing protected resources
+- Automatically redirect unauthenticated users to the login page
+
+For role-based access control, see [adminGuard](/api/guards/admin-guard).
+
+## Related
+
+- [adminGuard](/api/guards/admin-guard) - Role-based access control for admin users
+- [publicGuard](/api/guards/public-guard) - Prevents authenticated users from accessing public routes
+- [TokenStorageService](/api/services/token-storage-service) - Token management service

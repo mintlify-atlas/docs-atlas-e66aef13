@@ -1,0 +1,262 @@
+---
+title: 'Environment Configuration'
+description: 'Configure environment variables for different deployment environments'
+---
+
+## Overview
+
+The Biblioteca Virtual Frontend uses Angular's environment configuration system to manage settings across different deployment environments. Each environment has its own configuration file.
+
+## Environment Files
+
+The application includes three environment configurations:
+
+<CodeGroup>
+
+```typescript environment.ts
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:8080',
+};
+```
+
+```typescript environment.prod.ts
+export const environment = {
+  production: true,
+  apiUrl: 'http://biblioteca-backend:8080',
+};
+```
+
+```typescript environment.netlify.ts
+export const environment = {
+  production: true,
+  // URL pública de Render
+  apiUrl: 'https://biblioteca-virtual-backend-44v7.onrender.com',
+};
+```
+
+</CodeGroup>
+
+## Environment Types
+
+### Development Environment
+
+**File**: `src/environments/environment.ts`
+
+Used for local development with the backend running on localhost.
+
+- **Production**: `false`
+- **API URL**: `http://localhost:8080`
+
+```bash
+ng serve
+```
+
+### Production Environment (Docker)
+
+**File**: `src/environments/environment.prod.ts`
+
+Used for Docker-based deployments where frontend and backend are in the same network.
+
+- **Production**: `true`
+- **API URL**: `http://biblioteca-backend:8080` (internal Docker network)
+
+```bash
+ng build --configuration production
+```
+
+<Info>
+  The `biblioteca-backend` hostname refers to the backend service name in Docker Compose networking.
+</Info>
+
+### Netlify Environment
+
+**File**: `src/environments/environment.netlify.ts`
+
+Used for Netlify deployments connecting to the backend hosted on Render.
+
+- **Production**: `true`
+- **API URL**: `https://biblioteca-virtual-backend-44v7.onrender.com`
+
+```bash
+ng build --configuration netlify
+```
+
+## Building for Different Environments
+
+<Steps>
+  <Step title="Development Build">
+    Build with development configuration:
+    ```bash
+    ng build
+    ```
+  </Step>
+  
+  <Step title="Production Build (Docker)">
+    Build with production configuration:
+    ```bash
+    ng build --configuration production
+    ```
+  </Step>
+  
+  <Step title="Netlify Build">
+    Build with Netlify configuration:
+    ```bash
+    ng build --configuration netlify
+    ```
+  </Step>
+</Steps>
+
+## Angular Configuration
+
+The environment configurations are referenced in `angular.json`:
+
+```json
+{
+  "configurations": {
+    "production": {
+      "fileReplacements": [
+        {
+          "replace": "src/environments/environment.ts",
+          "with": "src/environments/environment.prod.ts"
+        }
+      ]
+    },
+    "netlify": {
+      "fileReplacements": [
+        {
+          "replace": "src/environments/environment.ts",
+          "with": "src/environments/environment.netlify.ts"
+        }
+      ]
+    }
+  }
+}
+```
+
+## Using Environment Variables
+
+Import and use the environment configuration in your services:
+
+```typescript
+import { environment } from '../environments/environment';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ApiService {
+  private apiUrl = environment.apiUrl;
+
+  constructor(private http: HttpClient) {}
+
+  getData() {
+    return this.http.get(`${this.apiUrl}/api/endpoint`);
+  }
+}
+```
+
+## Adding New Environment Variables
+
+<Steps>
+  <Step title="Update Environment Files">
+    Add the new variable to all environment files:
+    ```typescript
+    export const environment = {
+      production: false,
+      apiUrl: 'http://localhost:8080',
+      newVariable: 'value'
+    };
+    ```
+  </Step>
+  
+  <Step title="Use in Application">
+    Import and use the variable:
+    ```typescript
+    import { environment } from '../environments/environment';
+    
+    const value = environment.newVariable;
+    ```
+  </Step>
+</Steps>
+
+## Environment-Specific Features
+
+### Production Mode
+
+When `production: true`, Angular enables:
+
+- Ahead-of-Time (AOT) compilation
+- Production optimizations
+- Reduced bundle size
+- Disabled debugging tools
+
+### API URL Configuration
+
+The `apiUrl` determines the backend endpoint:
+
+| Environment | API URL | Use Case |
+|-------------|---------|----------|
+| Development | `http://localhost:8080` | Local development |
+| Production | `http://biblioteca-backend:8080` | Docker deployment |
+| Netlify | `https://biblioteca-virtual-backend-44v7.onrender.com` | Cloud deployment |
+
+<Warning>
+  Ensure the API URL is correct for your deployment environment. Incorrect URLs will result in failed API requests.
+</Warning>
+
+## Runtime Configuration
+
+For dynamic runtime configuration, consider using:
+
+### Environment Variables in Docker
+
+```dockerfile
+ENV API_URL=http://biblioteca-backend:8080
+```
+
+### Configuration Service
+
+Create a configuration service that loads settings at runtime:
+
+```typescript
+@Injectable({
+  providedIn: 'root'
+})
+export class ConfigService {
+  private config: any;
+
+  loadConfig() {
+    return this.http.get('/assets/config.json')
+      .pipe(tap(config => this.config = config));
+  }
+}
+```
+
+## Best Practices
+
+1. **Never commit secrets**: Keep sensitive data out of environment files
+2. **Use meaningful names**: Make variable names descriptive
+3. **Document changes**: Update documentation when adding variables
+4. **Validate URLs**: Ensure API endpoints are accessible
+5. **Test each environment**: Verify builds work for all configurations
+
+## Troubleshooting
+
+### Wrong API URL
+
+If the application connects to the wrong backend:
+
+1. Check the build configuration used
+2. Verify the correct environment file is being used
+3. Clear build cache: `rm -rf dist/`
+
+### Environment Not Loading
+
+Ensure file replacements are configured correctly in `angular.json`.
+
+### CORS Errors
+
+If you encounter CORS errors, verify:
+- The backend allows the frontend origin
+- The API URL is correctly configured
+- Network connectivity between services

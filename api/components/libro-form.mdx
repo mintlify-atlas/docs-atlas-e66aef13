@@ -1,0 +1,395 @@
+---
+title: LibroFormComponent
+description: Component for creating and editing book records
+---
+
+## Overview
+
+The `LibroFormComponent` provides a form interface for administrators to create new books or edit existing ones. It handles book details, genre selection, author assignment, and cover image management.
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-libro-form',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './libro-form.html',
+  styleUrls: ['./libro-form.css'],
+})
+```
+
+**Selector:** `app-libro-form`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+- `FormsModule` - Template-driven forms support
+- `RouterLink` - Router navigation
+
+**Template:** `./libro-form.html`
+
+## Properties
+
+### listaAutores
+
+```typescript
+listaAutores: Autor[] = []
+```
+
+Array of all available authors for selection in the multi-select dropdown.
+
+### listaGeneros
+
+```typescript
+listaGeneros: Genero[] = []
+```
+
+Array of all available genres for selection in the genre dropdown.
+
+### selectedGeneroId
+
+```typescript
+selectedGeneroId: number | null = null
+```
+
+Holds the ID of the selected genre. Used for binding to the select element.
+
+### selectedAutoresIds
+
+```typescript
+selectedAutoresIds: number[] = []
+```
+
+Array of selected author IDs. A book can have multiple authors.
+
+### libro
+
+```typescript
+libro: Libro = {
+  id: 0,
+  titulo: '',
+  portada: '',
+  anioPublicacion: new Date().getFullYear(),
+  disponible: true,
+  genero: { id: 0, nombre: '' },
+  autores: [],
+}
+```
+
+The book object being created or edited. Initialized with default values.
+
+### isEditing
+
+```typescript
+isEditing: boolean = false
+```
+
+Indicates whether the form is in edit mode (`true`) or create mode (`false`).
+
+## Injected Services
+
+```typescript
+private libroService = inject(LibroService)
+private autorService = inject(AutorService)
+private generoService = inject(GeneroService)
+private router = inject(Router)
+private route = inject(ActivatedRoute)
+```
+
+- **LibroService** - Book CRUD operations
+- **AutorService** - Fetches author data
+- **GeneroService** - Fetches genre data
+- **Router** - Navigation after save
+- **ActivatedRoute** - Reads route parameters to detect edit mode
+
+## Lifecycle Hooks
+
+### ngOnInit
+
+```typescript
+ngOnInit(): void {
+  this.cargarListas();
+  
+  const id = this.route.snapshot.paramMap.get('id');
+  if (id) {
+    this.isEditing = true;
+    this.cargarLibro(Number(id));
+  }
+}
+```
+
+1. Loads the lists of authors and genres
+2. Checks if an `id` parameter exists in the route
+3. If `id` exists, sets `isEditing` to `true` and loads the book data
+
+## Methods
+
+### cargarListas
+
+```typescript
+cargarListas(): void
+```
+
+Fetches all genres and authors from their respective services:
+- Calls `GeneroService.getAll()` and populates `listaGeneros`
+- Calls `AutorService.getAll()` and populates `listaAutores`
+- Logs errors to console if any occur
+
+### cargarLibro
+
+```typescript
+cargarLibro(id: number): void
+```
+
+Loads a specific book for editing:
+
+1. Calls `LibroService.getById(id)`
+2. Populates the `libro` object with the response data
+3. Maps the book's genre to `selectedGeneroId`
+4. Maps the book's authors to `selectedAutoresIds` array
+
+**Parameters:**
+- `id` - The numeric ID of the book to load
+
+### onSubmit
+
+```typescript
+onSubmit(): void
+```
+
+Handles form submission for both create and update operations:
+
+**Validation:**
+1. Checks that `titulo` is not empty
+2. Validates that a genre is selected
+3. Ensures at least one author is selected
+
+**Data Preparation:**
+- Creates a `libroParaEnviar` object with:
+  - All libro properties
+  - Genre as `{ id: selectedGeneroId }`
+  - Authors as array of `{ id }` objects
+- Removes the `id` property when creating a new book
+
+**API Call:**
+- If editing: Calls `LibroService.update()` with libro ID and data
+- If creating: Calls `LibroService.create()` with data (without ID)
+- On success: Shows success alert and navigates to `/libros`
+- On error: Shows error alert and logs to console
+
+## Template Features
+
+### Form Fields
+
+```html
+<form (ngSubmit)="onSubmit()">
+  <!-- Title -->
+  <input type="text" [(ngModel)]="libro.titulo" name="titulo" required />
+  
+  <!-- Publication Year -->
+  <input type="number" [(ngModel)]="libro.anioPublicacion" name="anio" />
+  
+  <!-- Availability Status -->
+  <select [(ngModel)]="libro.disponible" name="disponible">
+    <option [ngValue]="true">Disponible</option>
+    <option [ngValue]="false">Agotado</option>
+  </select>
+  
+  <!-- Genre Selection -->
+  <select [(ngModel)]="selectedGeneroId" name="genero" required>
+    <option [ngValue]="null" disabled>-- Selecciona un género --</option>
+    <option *ngFor="let g of listaGeneros" [value]="g.id">
+      {{ g.nombre }}
+    </option>
+  </select>
+  
+  <!-- Author Multi-Select -->
+  <select multiple [(ngModel)]="selectedAutoresIds" name="autores" required>
+    <option *ngFor="let a of listaAutores" [value]="a.id">
+      {{ a.nombre }}
+    </option>
+  </select>
+  
+  <!-- Cover URL -->
+  <input type="text" [(ngModel)]="libro.portada" name="portada" />
+  
+  <!-- Submit Buttons -->
+  <a routerLink="/libros" class="btn btn-secondary">Cancelar</a>
+  <button type="submit" class="btn btn-primary">
+    {{ isEditing ? 'Actualizar' : 'Guardar' }}
+  </button>
+</form>
+```
+
+## Full Source Code
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+
+// Servicios
+import { LibroService } from '../../../core/services/libro';
+import { AutorService } from '../../../core/services/autor';
+import { GeneroService } from '../../../core/services/genero';
+
+// Modelos
+import { Libro } from '../../../core/models/libro';
+import { Autor } from '../../../core/models/autor';
+import { Genero } from '../../../core/models/genero';
+
+@Component({
+  selector: 'app-libro-form',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './libro-form.html',
+  styleUrls: ['./libro-form.css'],
+})
+export class LibroFormComponent implements OnInit {
+  // Inyecciones
+  private libroService = inject(LibroService);
+  private autorService = inject(AutorService);
+  private generoService = inject(GeneroService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  // Listas para los desplegables
+  listaAutores: Autor[] = [];
+  listaGeneros: Genero[] = [];
+
+  // Variables temporales para capturar la selección del formulario
+  selectedGeneroId: number | null = null;
+  selectedAutoresIds: number[] = []; // Array porque un libro puede tener varios autores
+
+  // Objeto Libro base
+  libro: Libro = {
+    id: 0,
+    titulo: '',
+    portada: '',
+    anioPublicacion: new Date().getFullYear(),
+    disponible: true,
+    genero: { id: 0, nombre: '' },
+    autores: [],
+  };
+
+  isEditing: boolean = false;
+
+  ngOnInit(): void {
+    // Cargar las listas necesarias (Autores y Géneros)
+    this.cargarListas();
+
+    // Verificar si es edición
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.isEditing = true;
+      this.cargarLibro(Number(id));
+    }
+  }
+
+  cargarListas(): void {
+    // Cargar Generos
+    this.generoService.getAll().subscribe({
+      next: (data) => (this.listaGeneros = data),
+      error: (err) => console.error('Error cargando géneros', err),
+    });
+
+    // Cargar Autores
+    this.autorService.getAll().subscribe({
+      next: (data) => (this.listaAutores = data),
+      error: (err) => console.error('Error cargando autores', err),
+    });
+  }
+
+  cargarLibro(id: number): void {
+    this.libroService.getById(id).subscribe({
+      next: (data) => {
+        this.libro = data;
+
+        // Mapeo
+        if (this.libro.genero) {
+          this.selectedGeneroId = this.libro.genero.id;
+        }
+
+        if (this.libro.autores) {
+          // Extraemos IDs de los autores del libro
+          this.selectedAutoresIds = this.libro.autores.map((a) => a.id);
+        }
+      },
+      error: (err) => console.error('Error al cargar libro', err),
+    });
+  }
+
+  onSubmit(): void {
+    // Validaciones
+    if (!this.libro.titulo.trim()) {
+      alert('El título es obligatorio');
+      return;
+    }
+    if (!this.selectedGeneroId) {
+      alert('Debes seleccionar un género');
+      return;
+    }
+    if (this.selectedAutoresIds.length === 0) {
+      alert('Debes seleccionar al menos un autor');
+      return;
+    }
+
+    // Para el Backend
+    // IDs para Spring Boot
+    const libroParaEnviar = {
+      ...this.libro,
+      genero: { id: this.selectedGeneroId },
+      autores: this.selectedAutoresIds.map((id) => ({ id: Number(id) })),
+    };
+
+    // Si es crear, eliminamos el ID para evitar errores de Hibernate
+    if (!this.isEditing) {
+      delete (libroParaEnviar as any).id;
+    }
+
+    // Enviar
+    if (this.isEditing) {
+      this.libroService.update(this.libro.id, libroParaEnviar).subscribe({
+        next: () => {
+          alert('Libro actualizado correctamente');
+          this.router.navigate(['/libros']);
+        },
+        error: (err) => {
+          console.error(err);
+          alert('Error al actualizar');
+        },
+      });
+    } else {
+      this.libroService.create(libroParaEnviar).subscribe({
+        next: () => {
+          alert('Libro creado correctamente');
+          this.router.navigate(['/libros']);
+        },
+        error: (err) => {
+          console.error(err);
+          alert('Error al crear');
+        },
+      });
+    }
+  }
+}
+```
+
+## Related Components
+
+- [LibroListComponent](/api/components/libro-list) - View all books
+- [AutorListComponent](/api/components/autor-list) - Manage authors
+- [GeneroListComponent](/api/components/genero-list) - Manage genres
+
+## Related Services
+
+- [LibroService](/api/services/libro) - Book CRUD operations
+- [AutorService](/api/services/autor) - Author data
+- [GeneroService](/api/services/genero) - Genre data
+
+## Related Models
+
+- [Libro](/api/models/libro) - Book data structure
+- [Autor](/api/models/autor) - Author data structure
+- [Genero](/api/models/genero) - Genre data structure

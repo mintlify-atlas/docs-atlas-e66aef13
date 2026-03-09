@@ -1,0 +1,211 @@
+---
+title: LoginComponent
+description: Component for user authentication and login functionality
+---
+
+## Overview
+
+The `LoginComponent` handles user authentication, allowing users to log in with their credentials and redirecting them based on their role (Admin or User).
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  templateUrl: './login.html',
+  styleUrls: ['./login.css'],
+})
+```
+
+**Selector:** `app-login`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+- `ReactiveFormsModule` - Reactive forms support
+- `RouterLink` - Router navigation
+
+**Template:** `./login.html`
+
+## Properties
+
+### mensajeError
+
+```typescript
+mensajeError: string = ''
+```
+
+Stores error messages to display to the user when login fails or validation errors occur.
+
+### loginForm
+
+```typescript
+loginForm!: FormGroup
+```
+
+Reactive form group containing username and password controls with required validators.
+
+## Constructor Dependencies
+
+```typescript
+constructor(
+  private fb: FormBuilder,
+  private authService: AuthService,
+  private tokenStorage: TokenStorageService,
+  private router: Router
+)
+```
+
+- **FormBuilder** - Creates reactive form controls
+- **AuthService** - Handles authentication API calls
+- **TokenStorageService** - Manages authentication tokens
+- **Router** - Navigates to different routes after login
+
+## Lifecycle Hooks
+
+### ngOnInit
+
+```typescript
+ngOnInit(): void {}
+```
+
+Currently empty, reserved for future initialization logic.
+
+## Methods
+
+### onSubmit
+
+```typescript
+onSubmit(): void
+```
+
+Handles form submission and authentication:
+
+1. Validates the form is complete
+2. Extracts username and password from the form
+3. Calls the `AuthService.login()` method
+4. On success:
+   - Saves the session using `AuthService.saveSession()`
+   - Redirects to `/libros` if user is Admin
+   - Redirects to `/catalogo` if user is a regular User
+5. On error: Displays error message "Usuario o contraseña incorrectos"
+
+**Example usage in template:**
+
+```html
+<form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+  <div class="mb-3">
+    <label for="username" class="form-label">Usuario</label>
+    <input
+      type="text"
+      id="username"
+      class="form-control"
+      formControlName="username"
+      placeholder="Ingresa tu usuario"
+    />
+  </div>
+  
+  <div class="mb-3">
+    <label for="password" class="form-label">Contraseña</label>
+    <input
+      type="password"
+      id="password"
+      class="form-control"
+      formControlName="password"
+      placeholder="********"
+    />
+  </div>
+  
+  <button type="submit" class="btn btn-primary" [disabled]="loginForm.invalid">
+    Ingresar
+  </button>
+</form>
+```
+
+## Full Source Code
+
+```typescript
+import { Component } from '@angular/core';
+import {
+  FormBuilder,
+  Validators,
+  ReactiveFormsModule,
+  FormGroup,
+} from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { CommonModule } from '@angular/common';
+
+import { AuthService } from '../auth.service';
+import { TokenStorageService } from '../../core/services/token-storage.service';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  templateUrl: './login.html',
+  styleUrls: ['./login.css'],
+})
+export class LoginComponent {
+  mensajeError: string = '';
+  loginForm!: FormGroup;
+
+  constructor(
+    private fb: FormBuilder,
+    private authService: AuthService,
+    private tokenStorage: TokenStorageService,
+    private router: Router
+  ) {
+    this.loginForm = this.fb.group({
+      username: ['', Validators.required],
+      password: ['', Validators.required],
+    });
+  }
+
+  ngOnInit(): void {}
+
+  onSubmit() {
+    if (this.loginForm.invalid) {
+      this.mensajeError = 'Debe completar todos los campos';
+      return;
+    }
+
+    const { username, password } = this.loginForm.value;
+
+    const loginData = {
+      username: username!,
+      password: password!,
+    };
+
+    this.authService.login(loginData).subscribe({
+      next: (resp) => {
+        // Guardar sesíon
+        this.authService.saveSession(resp);
+
+        if (resp.role === 'ROLE_ADMIN') {
+          // Si es Admin
+          this.router.navigate(['/libros']);
+        } else {
+          // Si es User
+          this.router.navigate(['/catalogo']);
+        }
+      },
+      error: (err) => {
+        console.error('Error login:', err);
+        this.mensajeError = 'Usuario o contraseña incorrectos';
+      },
+    });
+  }
+}
+```
+
+## Related Components
+
+- [RegistroComponent](/api/components/registro) - User registration
+- [CatalogoComponent](/api/components/catalogo) - Book catalog for regular users
+- [LibroListComponent](/api/components/libro-list) - Book management for admins
+
+## Related Services
+
+- [AuthService](/api/services/auth) - Authentication API calls
+- [TokenStorageService](/api/services/token-storage) - Token management

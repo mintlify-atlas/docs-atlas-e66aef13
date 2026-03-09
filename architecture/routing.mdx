@@ -1,0 +1,382 @@
+---
+title: 'Routing Configuration'
+description: 'Complete routing setup with guards and navigation patterns'
+---
+
+## Overview
+
+Biblioteca Virtual uses Angular's standalone routing system with functional route guards. The routing configuration defines access control for public routes (login/register), authenticated user routes (catalog), and admin-only routes (management pages).
+
+## Route Configuration
+
+All routes are defined in `app.routes.ts` with appropriate guards for access control:
+
+```typescript src/app/app.routes.ts
+import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth-guard';
+import { publicGuard } from './core/guards/public-guard';
+import { adminGuard } from './core/guards/admin-guard';
+
+export const routes: Routes = [
+  // Default redirect to login
+  { path: '', redirectTo: 'auth/login', pathMatch: 'full' },
+
+  // Public routes (unauthenticated users only)
+  { path: 'auth/login', component: LoginComponent, canActivate: [publicGuard] },
+  { path: 'auth/registro', component: RegistroComponent, canActivate: [publicGuard] },
+
+  // User routes (authenticated users)
+  { path: 'catalogo', component: CatalogoComponent, canActivate: [authGuard] },
+
+  // Admin routes (authenticated admins only)
+  { path: 'libros', component: LibroListComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'libros/nuevo', component: LibroFormComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'libros/editar/:id', component: LibroFormComponent, canActivate: [authGuard, adminGuard] },
+  
+  { path: 'autores', component: AutorListComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'autores/nuevo', component: AutorFormComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'autores/editar/:id', component: AutorFormComponent, canActivate: [authGuard, adminGuard] },
+  
+  { path: 'generos', component: GeneroListComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'generos/nuevo', component: GeneroFormComponent, canActivate: [authGuard, adminGuard] },
+  { path: 'generos/editar/:id', component: GeneroFormComponent, canActivate: [authGuard, adminGuard] },
+  
+  { path: 'prestamos', component: PrestamoListComponent, canActivate: [authGuard, adminGuard] },
+
+  // Wildcard - redirect to login
+  { path: '**', redirectTo: 'auth/login' },
+];
+```
+
+## Route Categories
+
+### Public Routes
+
+Public routes are accessible only to unauthenticated users. The `publicGuard` redirects logged-in users to their appropriate dashboard.
+
+<CodeGroup>
+```typescript Login Route
+{
+  path: 'auth/login',
+  component: LoginComponent,
+  canActivate: [publicGuard]
+}
+```
+
+```typescript Registration Route
+{
+  path: 'auth/registro',
+  component: RegistroComponent,
+  canActivate: [publicGuard]
+}
+```
+</CodeGroup>
+
+<Info>
+  When a logged-in user tries to access `/auth/login`, they are automatically redirected to:
+  - `/libros` (admins)
+  - `/catalogo` (regular users)
+</Info>
+
+### Authenticated User Routes
+
+Routes that require authentication but are available to both users and admins:
+
+```typescript User Catalog Route
+{
+  path: 'catalogo',
+  component: CatalogoComponent,
+  canActivate: [authGuard]  // Any authenticated user
+}
+```
+
+### Admin-Only Routes
+
+Admin routes use **both** `authGuard` and `adminGuard` to ensure the user is authenticated AND has admin privileges:
+
+<Tabs>
+  <Tab title="Books (Libros)">
+    ```typescript
+    // List all books
+    { path: 'libros', component: LibroListComponent, canActivate: [authGuard, adminGuard] }
+    
+    // Create new book
+    { path: 'libros/nuevo', component: LibroFormComponent, canActivate: [authGuard, adminGuard] }
+    
+    // Edit existing book
+    { path: 'libros/editar/:id', component: LibroFormComponent, canActivate: [authGuard, adminGuard] }
+    ```
+  </Tab>
+  
+  <Tab title="Authors (Autores)">
+    ```typescript
+    // List all authors
+    { path: 'autores', component: AutorListComponent, canActivate: [authGuard, adminGuard] }
+    
+    // Create new author
+    { path: 'autores/nuevo', component: AutorFormComponent, canActivate: [authGuard, adminGuard] }
+    
+    // Edit existing author
+    { path: 'autores/editar/:id', component: AutorFormComponent, canActivate: [authGuard, adminGuard] }
+    ```
+  </Tab>
+  
+  <Tab title="Genres (Géneros)">
+    ```typescript
+    // List all genres
+    { path: 'generos', component: GeneroListComponent, canActivate: [authGuard, adminGuard] }
+    
+    // Create new genre
+    { path: 'generos/nuevo', component: GeneroFormComponent, canActivate: [authGuard, adminGuard] }
+    
+    // Edit existing genre
+    { path: 'generos/editar/:id', component: GeneroFormComponent, canActivate: [authGuard, adminGuard] }
+    ```
+  </Tab>
+  
+  <Tab title="Loans (Préstamos)">
+    ```typescript
+    // List all loans
+    { path: 'prestamos', component: PrestamoListComponent, canActivate: [authGuard, adminGuard] }
+    ```
+  </Tab>
+</Tabs>
+
+## Guard Execution Order
+
+When multiple guards are specified, they execute in order from left to right:
+
+```typescript
+canActivate: [authGuard, adminGuard]
+```
+
+<Steps>
+  <Step title="authGuard executes first">
+    Checks if the user has a valid JWT token
+    - **Pass**: Continue to next guard
+    - **Fail**: Redirect to `/auth/login`
+  </Step>
+  
+  <Step title="adminGuard executes second">
+    Checks if the user's role is `ROLE_ADMIN`
+    - **Pass**: Allow access to route
+    - **Fail**: Redirect to `/catalogo`
+  </Step>
+</Steps>
+
+<Warning>
+  Guards must be in the correct order. Placing `adminGuard` before `authGuard` could cause errors if the user is not authenticated.
+</Warning>
+
+## Route Parameters
+
+Edit routes use dynamic route parameters to identify which resource to edit:
+
+```typescript
+{ path: 'libros/editar/:id', component: LibroFormComponent }
+```
+
+### Accessing Route Parameters
+
+In the component, access the `id` parameter using Angular's `ActivatedRoute`:
+
+```typescript
+import { ActivatedRoute } from '@angular/router';
+
+export class LibroFormComponent {
+  private route = inject(ActivatedRoute);
+  
+  ngOnInit() {
+    const id = this.route.snapshot.params['id'];
+    // Load book with this ID
+  }
+}
+```
+
+## Navigation Patterns
+
+### Programmatic Navigation
+
+Navigate using Angular's `Router` service:
+
+```typescript
+import { Router } from '@angular/router';
+
+export class SomeComponent {
+  private router = inject(Router);
+  
+  goToBookList() {
+    this.router.navigate(['/libros']);
+  }
+  
+  editBook(id: number) {
+    this.router.navigate(['/libros/editar', id]);
+  }
+  
+  createNewBook() {
+    this.router.navigate(['/libros/nuevo']);
+  }
+}
+```
+
+### Template Navigation
+
+Use `routerLink` directive in templates:
+
+```html
+<!-- Navigate to list -->
+<a routerLink="/libros">Ver Libros</a>
+
+<!-- Navigate to create -->
+<button (click)="router.navigate(['/libros/nuevo'])">Nuevo Libro</button>
+
+<!-- Navigate to edit with ID -->
+<a [routerLink]="['/libros/editar', libro.id]">Editar</a>
+```
+
+## Redirect Behavior
+
+### Default Redirect
+
+When users access the root path `/`, they are redirected to login:
+
+```typescript
+{ path: '', redirectTo: 'auth/login', pathMatch: 'full' }
+```
+
+### 404 Handling
+
+Unknown routes redirect to login:
+
+```typescript
+{ path: '**', redirectTo: 'auth/login' }
+```
+
+### Role-Based Redirects
+
+The `publicGuard` implements intelligent redirects based on user role:
+
+```typescript src/app/core/guards/public-guard.ts
+if (token) {
+  const role = localStorage.getItem('role');
+  
+  if (role === 'ROLE_ADMIN') {
+    router.navigate(['/libros']);      // Admins → Book management
+  } else {
+    router.navigate(['/catalogo']);    // Users → Catalog
+  }
+  
+  return false;
+}
+```
+
+## Route Protection Summary
+
+<table>
+  <thead>
+    <tr>
+      <th>Route Pattern</th>
+      <th>Guards</th>
+      <th>Access</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`/auth/login`</td>
+      <td>`publicGuard`</td>
+      <td>Unauthenticated users only</td>
+    </tr>
+    <tr>
+      <td>`/auth/registro`</td>
+      <td>`publicGuard`</td>
+      <td>Unauthenticated users only</td>
+    </tr>
+    <tr>
+      <td>`/catalogo`</td>
+      <td>`authGuard`</td>
+      <td>Any authenticated user</td>
+    </tr>
+    <tr>
+      <td>`/libros/*`</td>
+      <td>`authGuard, adminGuard`</td>
+      <td>Admins only</td>
+    </tr>
+    <tr>
+      <td>`/autores/*`</td>
+      <td>`authGuard, adminGuard`</td>
+      <td>Admins only</td>
+    </tr>
+    <tr>
+      <td>`/generos/*`</td>
+      <td>`authGuard, adminGuard`</td>
+      <td>Admins only</td>
+    </tr>
+    <tr>
+      <td>`/prestamos`</td>
+      <td>`authGuard, adminGuard`</td>
+      <td>Admins only</td>
+    </tr>
+  </tbody>
+</table>
+
+## Common CRUD Patterns
+
+Most admin features follow this routing pattern:
+
+<CodeGroup>
+```typescript List View
+{ path: 'resource', component: ResourceListComponent, canActivate: [authGuard, adminGuard] }
+```
+
+```typescript Create Form
+{ path: 'resource/nuevo', component: ResourceFormComponent, canActivate: [authGuard, adminGuard] }
+```
+
+```typescript Edit Form
+{ path: 'resource/editar/:id', component: ResourceFormComponent, canActivate: [authGuard, adminGuard] }
+```
+</CodeGroup>
+
+<Note>
+  The same form component (`ResourceFormComponent`) is used for both create and edit operations. The presence of an `id` parameter determines which mode to use.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Use Guards" icon="shield">
+    Every route should have appropriate guards to prevent unauthorized access
+  </Card>
+  
+  <Card title="Guard Order Matters" icon="list-ol">
+    Place `authGuard` before `adminGuard` to ensure proper authentication checks
+  </Card>
+  
+  <Card title="Reuse Form Components" icon="recycle">
+    Use the same component for create and edit by checking route parameters
+  </Card>
+  
+  <Card title="Fallback Routes" icon="arrow-turn-down-right">
+    Always define a wildcard route to handle 404 scenarios
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/architecture/authentication" icon="key">
+    Learn how JWT authentication works
+  </Card>
+  
+  <Card title="Authorization Guards" href="/architecture/authorization" icon="lock">
+    Deep dive into guard implementation
+  </Card>
+  
+  <Card title="Navigation Component" href="/api/components/login" icon="bars">
+    Explore the navbar component
+  </Card>
+  
+  <Card title="Form Components" href="/api/components/libro-form" icon="pen-to-square">
+    Build CRUD forms with routing
+  </Card>
+</CardGroup>

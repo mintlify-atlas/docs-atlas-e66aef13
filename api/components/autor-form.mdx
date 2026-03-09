@@ -1,0 +1,249 @@
+---
+title: AutorFormComponent
+description: Component for creating and editing author records
+---
+
+## Overview
+
+The `AutorFormComponent` provides a form interface for administrators to create new authors or edit existing author information. It handles author name and optional photo URL.
+
+## Component Metadata
+
+```typescript
+@Component({
+  selector: 'app-autor-form',
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './autor-form.html',
+  styleUrls: ['./autor-form.css'],
+})
+```
+
+**Selector:** `app-autor-form`
+
+**Imports:**
+- `CommonModule` - Angular common directives
+- `FormsModule` - Template-driven forms support
+- `RouterLink` - Router navigation
+
+**Template:** `./autor-form.html`
+
+## Properties
+
+### autor
+
+```typescript
+autor: Autor = {
+  id: 0,
+  nombre: '',
+  urlFoto: '',
+}
+```
+
+The author object being created or edited. Initialized with default values:
+- `id`: Set to 0 for new authors
+- `nombre`: Empty string for author name
+- `urlFoto`: Empty string for optional photo URL
+
+### isEditing
+
+```typescript
+isEditing: boolean = false
+```
+
+Indicates whether the form is in edit mode (`true`) or create mode (`false`).
+
+## Injected Services
+
+```typescript
+private autorService = inject(AutorService)
+private router = inject(Router)
+private route = inject(ActivatedRoute)
+```
+
+- **AutorService** - Author CRUD operations
+- **Router** - Navigation after save
+- **ActivatedRoute** - Reads route parameters to detect edit mode
+
+## Lifecycle Hooks
+
+### ngOnInit
+
+```typescript
+ngOnInit(): void {
+  const id = this.route.snapshot.paramMap.get('id');
+
+  if (id) {
+    // Edita
+    this.isEditing = true;
+    this.cargarAutor(Number(id));
+  } else {
+    // Crea
+    this.isEditing = false;
+  }
+}
+```
+
+1. Checks if an `id` parameter exists in the route
+2. If `id` exists:
+   - Sets `isEditing` to `true`
+   - Loads the author data by calling `cargarAutor()`
+3. If no `id`:
+   - Sets `isEditing` to `false` (create mode)
+
+## Methods
+
+### cargarAutor
+
+```typescript
+cargarAutor(id: number): void
+```
+
+Loads a specific author for editing:
+
+1. Calls `AutorService.getById(id)`
+2. Populates the `autor` object with the response data
+3. Ensures `urlFoto` is an empty string if null/undefined
+4. Logs errors to console if any occur
+
+**Parameters:**
+- `id` - The numeric ID of the author to load
+
+### onSubmit
+
+```typescript
+onSubmit(): void
+```
+
+Handles form submission for both create and update operations:
+
+**Validation:**
+- Checks that `nombre` is not empty (after trimming whitespace)
+- Shows alert "El nombre es obligatorio" if validation fails
+
+**Update Mode (isEditing = true):**
+1. Calls `AutorService.update()` with the full `autor` object
+2. On success:
+   - Shows alert "Autor actualizado correctamente"
+   - Navigates to `/autores`
+3. On error:
+   - Logs error to console
+   - Shows alert "Error al actualizar el autor."
+
+**Create Mode (isEditing = false):**
+1. Creates `autorParaGuardar` object with only `nombre` and `urlFoto` (excludes `id`)
+2. Calls `AutorService.create()` with the data
+3. On success:
+   - Shows alert "Autor creado correctamente"
+   - Navigates to `/autores`
+4. On error:
+   - Logs error to console
+   - Shows alert "Error al crear el autor. Revisa la consola."
+
+## Full Source Code
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { AutorService } from '../../../core/services/autor';
+import { Autor } from '../../../core/models/autor';
+
+@Component({
+  selector: 'app-autor-form',
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './autor-form.html',
+  styleUrls: ['./autor-form.css'],
+})
+export class AutorFormComponent implements OnInit {
+  // Inyección de dependencias
+  private autorService = inject(AutorService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  // Objeto Autor inicializado
+  autor: Autor = {
+    id: 0,
+    nombre: '',
+    urlFoto: '',
+  };
+
+  isEditing: boolean = false;
+
+  ngOnInit(): void {
+    // Verifica si la URL tiene un ID
+    const id = this.route.snapshot.paramMap.get('id');
+
+    if (id) {
+      // Edita
+      this.isEditing = true;
+      this.cargarAutor(Number(id));
+    } else {
+      // Crea
+      this.isEditing = false;
+    }
+  }
+
+  cargarAutor(id: number): void {
+    this.autorService.getById(id).subscribe({
+      next: (data) => {
+        this.autor = data;
+        if (!this.autor.urlFoto) this.autor.urlFoto = '';
+      },
+      error: (err) => console.error('Error al cargar autor', err),
+    });
+  }
+
+  onSubmit(): void {
+    // Validación
+    if (!this.autor.nombre.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+
+    if (this.isEditing) {
+      // Edita
+      this.autorService.update(this.autor.id, this.autor).subscribe({
+        next: () => {
+          alert('Autor actualizado correctamente');
+          this.router.navigate(['/autores']);
+        },
+        error: (err) => {
+          console.error('Error al actualizar:', err);
+          alert('Error al actualizar el autor.');
+        },
+      });
+    } else {
+      // Crea
+      const autorParaGuardar = {
+        nombre: this.autor.nombre,
+        urlFoto: this.autor.urlFoto,
+      };
+
+      this.autorService.create(autorParaGuardar as any).subscribe({
+        next: () => {
+          alert('Autor creado correctamente');
+          this.router.navigate(['/autores']);
+        },
+        error: (err) => {
+          console.error('Error al crear:', err);
+          alert('Error al crear el autor. Revisa la consola.');
+        },
+      });
+    }
+  }
+}
+```
+
+## Related Components
+
+- [AutorListComponent](/api/components/autor-list) - View all authors
+- [LibroFormComponent](/api/components/libro-form) - Associates authors with books
+
+## Related Services
+
+- [AutorService](/api/services/autor) - Author CRUD operations
+
+## Related Models
+
+- [Autor](/api/models/autor) - Author data structure
