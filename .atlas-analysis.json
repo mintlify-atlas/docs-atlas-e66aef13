@@ -1,0 +1,143 @@
+{
+  "projectType": "frontend",
+  "projectName": "Biblioteca Virtual Frontend",
+  "projectDescription": "Angular-based frontend application for a virtual library management system with role-based access control",
+  "theme": "palm",
+  "primaryColor": "#2C5F8D",
+  "lightColor": "#4A90D9",
+  "darkColor": "#1A3A52",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "architecture/overview",
+              "architecture/routing",
+              "architecture/authentication",
+              "architecture/authorization"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/catalog",
+              "features/loans",
+              "features/admin-panel"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/environment",
+              "deployment/ci-cd"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": [
+              "api/services/auth-service",
+              "api/services/libro-service",
+              "api/services/autor-service",
+              "api/services/genero-service",
+              "api/services/prestamo-service",
+              "api/services/token-storage-service"
+            ]
+          },
+          {
+            "group": "Guards",
+            "pages": [
+              "api/guards/auth-guard",
+              "api/guards/admin-guard",
+              "api/guards/public-guard"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/auth-interface",
+              "api/models/libro",
+              "api/models/autor",
+              "api/models/genero",
+              "api/models/prestamo"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "api/components/login",
+              "api/components/registro",
+              "api/components/catalogo",
+              "api/components/libro-list",
+              "api/components/libro-form",
+              "api/components/autor-list",
+              "api/components/autor-form",
+              "api/components/genero-list",
+              "api/components/genero-form",
+              "api/components/prestamo-list"
+            ]
+          },
+          {
+            "group": "Interceptors",
+            "pages": [
+              "api/interceptors/auth-interceptor"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT-based authentication and authorization",
+    "Role-based access control (Admin/User)",
+    "Public catalog with book browsing",
+    "Loan request management system",
+    "Admin panel for managing books, authors, and genres",
+    "HTTP interceptors for automatic token injection",
+    "Dockerized deployment with multi-stage builds",
+    "CI/CD pipeline with GitHub Actions"
+  ],
+  "publicApiSurface": [
+    "AuthService.login()",
+    "AuthService.register()",
+    "AuthService.logout()",
+    "LibroService.getAll()",
+    "LibroService.getById()",
+    "LibroService.create()",
+    "LibroService.update()",
+    "LibroService.delete()",
+    "AutorService.getAll()",
+    "AutorService.getById()",
+    "AutorService.create()",
+    "AutorService.update()",
+    "AutorService.delete()",
+    "GeneroService.getAll()",
+    "GeneroService.getById()",
+    "GeneroService.create()",
+    "GeneroService.update()",
+    "GeneroService.delete()",
+    "PrestamoService.solicitar()",
+    "PrestamoService.listar()",
+    "PrestamoService.aprobar()",
+    "PrestamoService.rechazar()",
+    "authGuard",
+    "adminGuard",
+    "publicGuard"
+  ]
+}
