@@ -8,10 +8,6 @@
     "dark": "#1A3A52"
   },
   "favicon": "/favicon.svg",
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
   "navbar": {
     "primary": {
       "type": "github",
@@ -107,7 +103,8 @@
               "api/components/autor-form",
               "api/components/genero-list",
               "api/components/genero-form",
-              "api/components/prestamo-list"
+              "api/components/prestamo-list",
+              "api/components/navbar"
             ]
           },
           {

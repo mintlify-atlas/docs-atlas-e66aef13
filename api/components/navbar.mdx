@@ -1,0 +1,227 @@
+---
+title: 'NavbarComponent'
+description: 'Navigation bar component with role-based menu and logout functionality'
+---
+
+## Overview
+
+The `NavbarComponent` is a shared navigation bar displayed across the application when users are authenticated. It provides role-based navigation links and logout functionality.
+
+**Selector**: `app-navbar`
+
+**Location**: `src/app/shared/components/navbar/navbar.ts:13`
+
+**Type**: Standalone component
+
+## Metadata
+
+```typescript
+@Component({
+  selector: 'app-navbar',
+  standalone: true,
+  imports: [CommonModule, RouterLink, RouterLinkActive],
+  templateUrl: './navbar.html',
+  styleUrls: ['./navbar.css'],
+})
+```
+
+## Constructor
+
+```typescript
+private tokenStorage = inject(TokenStorageService);
+public router = inject(Router);
+```
+
+Uses Angular's `inject()` function to obtain service instances.
+
+## Properties
+
+### isLoggedIn
+
+Dynamic getter that determines if the user is logged in and not on authentication pages.
+
+```typescript
+get isLoggedIn(): boolean
+```
+
+**Returns**: `boolean` - True if user has a token and is not on login/registro pages
+
+**Logic**:
+- Checks for token existence via `TokenStorageService`
+- Excludes `/auth/login` and `/auth/registro` routes
+- Used to conditionally display navigation elements
+
+**Example Usage in Template**:
+
+```html
+<nav *ngIf="isLoggedIn">
+  <!-- Navigation items -->
+</nav>
+```
+
+### usuarioNombre
+
+Dynamic getter that returns the current user's username.
+
+```typescript
+get usuarioNombre(): string
+```
+
+**Returns**: `string` - Username from localStorage or "Usuario" as fallback
+
+**Storage Key**: `username`
+
+**Example Usage**:
+
+```html
+<span class="user-name">{{ usuarioNombre }}</span>
+```
+
+### rol
+
+Dynamic getter that returns the current user's role.
+
+```typescript
+get rol(): string
+```
+
+**Returns**: `string` - Role from localStorage (e.g., "ROLE_ADMIN", "ROLE_USER")
+
+**Storage Key**: `role`
+
+### isAdmin
+
+Checks if the current user has admin role.
+
+```typescript
+get isAdmin(): boolean
+```
+
+**Returns**: `boolean` - True if role is "ROLE_ADMIN"
+
+**Example Usage**:
+
+```html
+<a *ngIf="isAdmin" routerLink="/libros">Gestionar Libros</a>
+```
+
+### isUser
+
+Checks if the current user has regular user role.
+
+```typescript
+get isUser(): boolean
+```
+
+**Returns**: `boolean` - True if role is "ROLE_USER"
+
+**Example Usage**:
+
+```html
+<a *ngIf="isUser" routerLink="/catalogo">Catálogo</a>
+```
+
+## Methods
+
+### ngOnInit()
+
+Lifecycle hook called after component initialization.
+
+```typescript
+ngOnInit(): void
+```
+
+Currently empty implementation. Available for future initialization logic.
+
+### logout()
+
+Logs out the current user and redirects to login page.
+
+```typescript
+logout(): void
+```
+
+**Actions**:
+1. Calls `TokenStorageService.signOut()` to clear the JWT token
+2. Clears all localStorage data
+3. Navigates to `/auth/login`
+
+**Example Usage in Template**:
+
+```html
+<button (click)="logout()">
+  Cerrar Sesión
+</button>
+```
+
+**Example Implementation**:
+
+```typescript
+// Component method (navbar.ts:48-52)
+logout(): void {
+  this.tokenStorage.signOut();
+  localStorage.clear();
+  this.router.navigate(['/auth/login']);
+}
+```
+
+## Template Structure
+
+The navbar typically includes:
+
+- **Logo/Brand**: Application name or logo
+- **Role-based Navigation**: Different links for admins vs regular users
+- **User Info**: Display username
+- **Logout Button**: Triggers the logout() method
+
+**Example Admin Navigation**:
+
+```html
+<nav *ngIf="isLoggedIn" class="navbar">
+  <div class="brand">Biblioteca Virtual</div>
+  
+  <div *ngIf="isAdmin" class="nav-links">
+    <a routerLink="/libros" routerLinkActive="active">Libros</a>
+    <a routerLink="/autores" routerLinkActive="active">Autores</a>
+    <a routerLink="/generos" routerLinkActive="active">Géneros</a>
+    <a routerLink="/prestamos" routerLinkActive="active">Préstamos</a>
+  </div>
+  
+  <div *ngIf="isUser" class="nav-links">
+    <a routerLink="/catalogo" routerLinkActive="active">Catálogo</a>
+  </div>
+  
+  <div class="user-info">
+    <span>{{ usuarioNombre }}</span>
+    <button (click)="logout()">Salir</button>
+  </div>
+</nav>
+```
+
+## Usage
+
+The navbar is typically included in the root `AppComponent` template:
+
+```typescript
+// app.ts
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { NavbarComponent } from './shared/components/navbar/navbar';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [RouterOutlet, NavbarComponent],
+  template: `
+    <app-navbar />
+    <router-outlet />
+  `,
+})
+export class AppComponent {}
+```
+
+## Related
+
+- [TokenStorageService](/api/services/token-storage-service) - Manages JWT token storage
+- [AuthService](/api/services/auth-service) - Handles authentication logic
+- [Authorization Guards](/api/guards/auth-guard) - Protect routes based on roles
